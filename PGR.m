@@ -1,9 +1,9 @@
 function [x] = PGR(A,b,x_guess,tol,max_iter,omega,m,p,PC)
 % Periodic Galerkin-Richardson (PGR) MATLAB code
 % Copyright (C) 2018 Material Physics & Mechanics Group at Georgia Tech.
-% Authors: Phanisri Pradeep Pratapa, Phanish Suryanarayana, Xin Jing
+% Authors: Phanish Suryanarayana, Xin Jing
 % (In collaboration with John E. Pask.)
-% Last Modified: 6 Feb 2020  
+% Last Modified: 7 Feb 2020  
 % Solves the system Ax = b
 % Inputs: A       : square matrix (size N x N),
 %         b       : right hand side column vector (size N x 1),

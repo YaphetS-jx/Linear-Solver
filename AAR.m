@@ -1,9 +1,9 @@
 function [x] = AAR(A,b,x_guess,tol,max_iter,omega,beta,m,p,PC)
 % Preconditioned Alternating Anderson-Richardson (AAR) MATLAB code
 % Copyright (C) 2018 Material Physics & Mechanics Group at Georgia Tech.
-% Authors: Phanisri Pradeep Pratapa, Phanish Suryanarayana, Xin Jing
+% Authors: Phanish Suryanarayana, Xin Jing
 % (In collaboration with John E. Pask.)
-% Last Modified: 6 Feb 2020  
+% Last Modified: 7 Feb 2020  
 % Solves the system Ax = b
 % Inputs: A       : square matrix (size N x N),
 %         b       : right hand side column vector (size N x 1),
