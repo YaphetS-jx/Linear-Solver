@@ -8,17 +8,18 @@ This code is for solving real-valued systems of equations using the AAR method, 
 (3) Output file :    "test.out" - prints number of processors used, input parameters, time taken by the solver.
 
 (4) Parameters in the command line
-    aar_pc - 0 or 1 indicates use of Jacobi or Block-Jacobi preconditioning respectively
+    solver - 0 or 1 or 2 indicates the use of AAR, PGR, PL2R respectively
+    pc - 0 or 1 indicates use of Jacobi or Block-Jacobi preconditioning respectively
     solver_tol - convergence tolerance for the solver
-    m_aar - AAR solver parameter (history)
-    p_aar - AAR solver parameter (frequency of Anderson extrapolation, if p_aar=1, then it is AR)
-    omega_aar - AAR solver parameter (Richardson relaxation)
-    beta_aar - AAR solver parameter (Anderson relaxation)
+    m - solver parameter (history)
+    p - solver parameter (frequency of Anderson extrapolation, if p_aar=1, then it is AR)
+    omega - solver parameter (Richardson relaxation)
+    beta - solver parameter (Anderson relaxation)
     
 (5) Running the code: (e.g. for 8 processors)
 
-          #mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n np ./AAR_Real pc tol m p omega beta 
-           mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./AAR_Real 0 1e-6 13 11 1.0 0.9 -log_summary>test.out
+        #mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n np ./petsc_real solver pc tol m p omega beta 
+        mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./petsc_real 0 0 1e-6 13 11 1.0 0.9 -log_summary>test.out
 	   
 (6) The executable (AAR_Real) is created in the root directory and the source code is in the file named AAR_Real.cc. 
 

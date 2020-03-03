@@ -10,50 +10,59 @@
 
 #include "system.h"
 
-void Read_parameters(AAR_OBJ* pAAR, int argc, char **argv) {    
+void Read_parameters(petsc_real* system, int argc, char **argv) {    
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     PetscInt p,i;
     PetscReal Nr, Dr, val;
 
-    pAAR->order = 1; 
+    system->order = 3; 
     // store half order
-    pAAR->numPoints_x = 8; pAAR->numPoints_y = 8; pAAR->numPoints_z = 8;
+    system->numPoints_x = 48; system->numPoints_y = 48; system->numPoints_z = 48;
 
-    if (argc < 7) {
-        if (rank==0) printf("Wrong inputs");
+    if (argc < 8) {
+        PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n");
         exit(-1);
     } else {
-        pAAR->pc = atoi(argv[1]);
-        pAAR->solver_tol = atof(argv[2]);
-        pAAR->m_aar = atoi(argv[3]);
-        pAAR->p_aar = atoi(argv[4]);
-        pAAR->omega_aar = atof(argv[5]);
-        pAAR->beta_aar = atof(argv[6]);
+        system->solver = atoi(argv[1]);
+        system->pc = atoi(argv[2]);
+        system->solver_tol = atof(argv[3]);
+        system->m = atoi(argv[4]);
+        system->p = atoi(argv[5]);
+        system->omega = atof(argv[6]);
+        system->beta = atof(argv[7]);
     }
 
+    if (system->solver >2 || system->solver <0){
+        PetscPrintf(PETSC_COMM_WORLD, "Nonexistent solver\n");
+        exit(-1);
+    }
 
+    if (system->pc >1 || system->pc <0){
+        PetscPrintf(PETSC_COMM_WORLD, "Nonexistent precondition\n");
+        exit(-1);
+    }
 
     //coefficients of the laplacian
-    pAAR->coeffs[0] = 0;
-    for (p=1; p<=pAAR->order; p++)
-        pAAR->coeffs[0]+= ((PetscReal)1.0/(p*p));
+    system->coeffs[0] = 0;
+    for (p=1; p<=system->order; p++)
+        system->coeffs[0]+= ((PetscReal)1.0/(p*p));
 
-    pAAR->coeffs[0]*=((PetscReal)3.0);
+    system->coeffs[0]*=((PetscReal)3.0);
 
-    for (p=1;p<=pAAR->order;p++) {
+    for (p=1;p<=system->order;p++) {
         Nr=1; 
         Dr=1;
-        for(i=pAAR->order-p+1; i<=pAAR->order; i++)
+        for(i=system->order-p+1; i<=system->order; i++)
             Nr*=i;
-        for(i=pAAR->order+1; i<=pAAR->order+p; i++)
+        for(i=system->order+1; i<=system->order+p; i++)
             Dr*=i;
         val = Nr/Dr;  
-        pAAR->coeffs[p] = (PetscReal)(-1*pow(-1,p+1)*val/(p*p*(1)));
+        system->coeffs[p] = (PetscReal)(-1*pow(-1,p+1)*val/(p*p*(1)));
     }
 
-    for (p=0;p<=pAAR->order;p++) {
-        pAAR->coeffs[p] = pAAR->coeffs[p]/(2*M_PI); 
+    for (p=0;p<=system->order;p++) {
+        system->coeffs[p] = system->coeffs[p]/(2*M_PI); 
         // so total (-1/4*pi) factor on fd coeffs
     }  
 
@@ -61,13 +70,22 @@ void Read_parameters(AAR_OBJ* pAAR, int argc, char **argv) {
     PetscPrintf(PETSC_COMM_WORLD,"                           INPUT PARAMETERS                                \n");
     PetscPrintf(PETSC_COMM_WORLD,"***************************************************************************\n");
 
-    //PetscPrintf(PETSC_COMM_WORLD,"FD_ORDER    : %d\n",2*pAAR->order);
-    PetscPrintf(PETSC_COMM_WORLD,"aar_pc      : %d\n",pAAR->pc);
-    PetscPrintf(PETSC_COMM_WORLD,"solver_tol  : %e \n",pAAR->solver_tol);
-    PetscPrintf(PETSC_COMM_WORLD,"m_aar       : %d\n",pAAR->m_aar);
-    PetscPrintf(PETSC_COMM_WORLD,"p_aar       : %d\n",pAAR->p_aar);
-    PetscPrintf(PETSC_COMM_WORLD,"omega_aar   : %lf\n",pAAR->omega_aar);
-    PetscPrintf(PETSC_COMM_WORLD,"beta_aar    : %lf\n",pAAR->beta_aar);
+    //PetscPrintf(PETSC_COMM_WORLD,"FD_ORDER    : %d\n",2*system->order);
+    if (system->solver == 0)
+        PetscPrintf(PETSC_COMM_WORLD,"Solver   : AAR\n");
+    else if (system->solver == 1)
+        PetscPrintf(PETSC_COMM_WORLD,"Solver   : PGR\n");
+    else
+        PetscPrintf(PETSC_COMM_WORLD,"Solver   : PL2R\n");
+    if (system->pc == 1)
+        PetscPrintf(PETSC_COMM_WORLD,"system_pc  : Block-Jacobi using ICC(0)\n");
+    else
+        PetscPrintf(PETSC_COMM_WORLD,"system_pc  : Jacobi \n");
+    PetscPrintf(PETSC_COMM_WORLD,"solver_tol  : %e \n",system->solver_tol);
+    PetscPrintf(PETSC_COMM_WORLD,"m       : %d\n",system->m);
+    PetscPrintf(PETSC_COMM_WORLD,"p       : %d\n",system->p);
+    PetscPrintf(PETSC_COMM_WORLD,"omega   : %lf\n",system->omega);
+    PetscPrintf(PETSC_COMM_WORLD,"beta    : %lf\n",system->beta);
 
     PetscPrintf(PETSC_COMM_WORLD,"***************************************************************************\n");
 
@@ -80,21 +98,21 @@ void Read_parameters(AAR_OBJ* pAAR, int argc, char **argv) {
 /*****************************************************************************/
 /*****************************************************************************/
 
-void Setup_and_Initialize(AAR_OBJ* pAAR, int argc, char **argv) {
-    ObjectInitialize(pAAR);
-    Read_parameters(pAAR, argc, argv);
-    Objects_Create(pAAR);      
+void Setup_and_Initialize(petsc_real* system, int argc, char **argv) {
+    ObjectInitialize(system);
+    Read_parameters(system, argc, argv);
+    Objects_Create(system);      
 }
 
-void ObjectInitialize(AAR_OBJ* pAAR) {
-    PetscOptionsGetString(PETSC_NULL,"-name",pAAR->file,sizeof(pAAR->file),PETSC_NULL);
+void ObjectInitialize(petsc_real* system) {
+    PetscOptionsGetString(PETSC_NULL,"-name",system->file,sizeof(system->file),PETSC_NULL);
 }
 
-void Objects_Create(AAR_OBJ* pAAR) {
-    PetscInt n_x = pAAR->numPoints_x;
-    PetscInt n_y = pAAR->numPoints_y;
-    PetscInt n_z = pAAR->numPoints_z;
-    PetscInt o = pAAR->order;
+void Objects_Create(petsc_real* system) {
+    PetscInt n_x = system->numPoints_x;
+    PetscInt n_y = system->numPoints_y;
+    PetscInt n_z = system->numPoints_z;
+    PetscInt o = system->order;
     double RHSsum;
 
     PetscInt gxdim,gydim,gzdim,xcor,ycor,zcor,lxdim,lydim,lzdim,nprocx,nprocy,nprocz;
@@ -104,10 +122,10 @@ void Objects_Create(AAR_OBJ* pAAR) {
     MPI_Comm_size(PETSC_COMM_WORLD,&comm_size);
 
     DMDACreate3d(PETSC_COMM_WORLD,DM_BOUNDARY_PERIODIC,DM_BOUNDARY_PERIODIC,DM_BOUNDARY_PERIODIC,DMDA_STENCIL_STAR,n_x,n_y,n_z,
-    PETSC_DECIDE,PETSC_DECIDE,PETSC_DECIDE,1,o,0,0,0,&pAAR->da);        // create a pattern and communication layout
+    PETSC_DECIDE,PETSC_DECIDE,PETSC_DECIDE,1,o,0,0,0,&system->da);        // create a pattern and communication layout
 
-    DMCreateGlobalVector(pAAR->da,&pAAR->RHS);                          // using the layour of da to create vectors RHS
-    VecDuplicate(pAAR->RHS,&pAAR->Phi);                                 // create Phi by duplicating the pattern of RHS
+    DMCreateGlobalVector(system->da,&system->RHS);                          // using the layour of da to create vectors RHS
+    VecDuplicate(system->RHS,&system->Phi);                                 // create Phi by duplicating the pattern of RHS
 
     PetscRandom rnd;
     unsigned long seed;
@@ -123,11 +141,11 @@ void Objects_Create(AAR_OBJ* pAAR) {
     PetscRandomSetSeed(rnd,seed);
     PetscRandomSeed(rnd);
 
-    VecSetRandom(pAAR->RHS,rnd);
+    VecSetRandom(system->RHS,rnd);
 
-    VecSum(pAAR->RHS,&RHSsum);
+    VecSum(system->RHS,&RHSsum);
     RHSsum = -RHSsum/(n_x*n_y*n_z);
-    VecShift(pAAR->RHS,RHSsum); 
+    VecShift(system->RHS,RHSsum); 
 
     PetscRandomDestroy(&rnd);
 
@@ -138,27 +156,27 @@ void Objects_Create(AAR_OBJ* pAAR) {
     PetscRandomSetSeed(rnd,seed);
     PetscRandomSeed(rnd);
 
-    VecSetRandom(pAAR->Phi,rnd);
+    VecSetRandom(system->Phi,rnd);
 
     PetscRandomDestroy(&rnd);
 
     if (comm_size == 1 ) {
-        DMCreateMatrix(pAAR->da,&pAAR->poissonOpr);
-        DMSetMatType(pAAR->da,MATSEQSBAIJ); // sequential symmetric block sparse matrices
+        DMCreateMatrix(system->da,&system->poissonOpr);
+        DMSetMatType(system->da,MATSEQSBAIJ); // sequential symmetric block sparse matrices
     } else  {
-        DMCreateMatrix(pAAR->da,&pAAR->poissonOpr);
-        DMSetMatType(pAAR->da,MATMPISBAIJ); // distributed symmetric sparse block matrices
+        DMCreateMatrix(system->da,&system->poissonOpr);
+        DMSetMatType(system->da,MATMPISBAIJ); // distributed symmetric sparse block matrices
     }
 
 }
 
 
 // Destroy objects
-void Objects_Destroy(AAR_OBJ* pAAR) {
-    DMDestroy(&pAAR->da);
-    VecDestroy(&pAAR->RHS); 
-    VecDestroy(&pAAR->Phi);
-    MatDestroy(&pAAR->poissonOpr); 
+void Objects_Destroy(petsc_real* system) {
+    DMDestroy(&system->da);
+    VecDestroy(&system->RHS); 
+    VecDestroy(&system->Phi);
+    MatDestroy(&system->poissonOpr); 
 
     return;
 }
@@ -169,29 +187,29 @@ void Objects_Destroy(AAR_OBJ* pAAR) {
 /*****************************************************************************/
 /*****************************************************************************/
 
-void ComputeMatrixA(AAR_OBJ* pAAR) {
+void ComputeMatrixA(petsc_real* system) {
     PetscInt i,j,k,l,colidx,gxdim,gydim,gzdim,xcor,ycor,zcor,lxdim,lydim,lzdim,nprocx,nprocy,nprocz;
     MatStencil row;
     MatStencil* col;
     PetscScalar* val;
-    PetscInt o = pAAR->order;  
+    PetscInt o = system->order;  
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
     PetscScalar Dinv_factor;
-    Dinv_factor = (pAAR->coeffs[0]); // (-1/4pi)(Lap) = Diag term
-    pAAR->Dinv_factor = 1/Dinv_factor;
+    Dinv_factor = (system->coeffs[0]); // (-1/4pi)(Lap) = Diag term
+    system->Dinv_factor = 1/Dinv_factor;
 
-    DMDAGetInfo(pAAR->da,0,&gxdim,&gydim,&gzdim,&nprocx,&nprocy,&nprocz,0,0,0,0,0,0);  // only get xyz dimension and number of processes in each direction
+    DMDAGetInfo(system->da,0,&gxdim,&gydim,&gzdim,&nprocx,&nprocy,&nprocz,0,0,0,0,0,0);  // only get xyz dimension and number of processes in each direction
     PetscPrintf(PETSC_COMM_WORLD,"nprocx: %d, nprocy: %d, nprocz: %d\n",nprocx,nprocy,nprocz); 
     // PetscPrintf(PETSC_COMM_WORLD,"gxdim: %d, gydim: %d, gzdim: %d\n",gxdim, gydim, gzdim);  dim = number of points
 
-    DMDAGetCorners(pAAR->da,&xcor,&ycor,&zcor,&lxdim,&lydim,&lzdim);
+    DMDAGetCorners(system->da,&xcor,&ycor,&zcor,&lxdim,&lydim,&lzdim);
     // printf("rank: %d, xcor: %d, ycor: %d, zcor: %d, lxdim: %d, lydim: %d, lzdim: %d\n",rank, xcor,ycor,zcor,lxdim,lydim,lzdim);
     // Returns the global (x,y,z) indices of the lower left corner and size of the local region, excluding ghost points.
 
-    MatScale(pAAR->poissonOpr,0.0);
-    // MatView(pAAR->poissonOpr,PETSC_VIEWER_STDOUT_WORLD);
+    MatScale(system->poissonOpr,0.0);
+    // MatView(system->poissonOpr,PETSC_VIEWER_STDOUT_WORLD);
 
     PetscMalloc(sizeof(MatStencil)*(o*6+1),&col);
     PetscMalloc(sizeof(PetscScalar)*(o*6+1),&val);
@@ -204,32 +222,32 @@ void ComputeMatrixA(AAR_OBJ* pAAR) {
 
                 colidx=0; 
                 col[colidx].i=i ;col[colidx].j=j ;col[colidx].k=k ;
-                val[colidx++]=pAAR->coeffs[0] ;
+                val[colidx++]=system->coeffs[0] ;
                 for(l=1;l<=o;l++) {
                     // z
                     col[colidx].i=i ;col[colidx].j=j ;col[colidx].k=k-l ;
-                    val[colidx++]=pAAR->coeffs[l];
+                    val[colidx++]=system->coeffs[l];
                     col[colidx].i=i ;col[colidx].j=j ;col[colidx].k=k+l ;
-                    val[colidx++]=pAAR->coeffs[l];
+                    val[colidx++]=system->coeffs[l];
                     //y 
                     col[colidx].i=i ;col[colidx].j=j-l ;col[colidx].k=k ;
-                    val[colidx++]=pAAR->coeffs[l];
+                    val[colidx++]=system->coeffs[l];
                     col[colidx].i=i ;col[colidx].j=j+l ;col[colidx].k=k ;
-                    val[colidx++]=pAAR->coeffs[l];
+                    val[colidx++]=system->coeffs[l];
                     // x
                     col[colidx].i=i-l ;col[colidx].j=j ;col[colidx].k=k ;
-                    val[colidx++]=pAAR->coeffs[l];
+                    val[colidx++]=system->coeffs[l];
                     col[colidx].i=i+l ;col[colidx].j=j ;col[colidx].k=k ;
-                    val[colidx++]=pAAR->coeffs[l];
+                    val[colidx++]=system->coeffs[l];
 
                     // 3 directions x y z and positive axis and negative axis
                 }
-                MatSetValuesStencil(pAAR->poissonOpr,1,&row,6*o+1,col,val,ADD_VALUES); // ADD_VALUES, add values to any existing value
+                MatSetValuesStencil(system->poissonOpr,1,&row,6*o+1,col,val,ADD_VALUES); // ADD_VALUES, add values to any existing value
             }
         }
     }
-    MatAssemblyBegin(pAAR->poissonOpr, MAT_FINAL_ASSEMBLY);
-    MatAssemblyEnd(pAAR->poissonOpr, MAT_FINAL_ASSEMBLY); 
+    MatAssemblyBegin(system->poissonOpr, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(system->poissonOpr, MAT_FINAL_ASSEMBLY); 
 
-    // MatView(pAAR->poissonOpr,PETSC_VIEWER_STDOUT_WORLD);
+    // MatView(system->poissonOpr,PETSC_VIEWER_STDOUT_WORLD);
 }

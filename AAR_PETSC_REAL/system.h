@@ -40,11 +40,12 @@ typedef struct {
 
     char file[30];    
 
+    PetscInt solver;
     PetscReal solver_tol;
-    PetscInt m_aar;
-    PetscInt p_aar;
-    PetscReal omega_aar;
-    PetscReal beta_aar;
+    PetscInt m;
+    PetscInt p;
+    PetscReal omega;
+    PetscReal beta;
     PetscScalar Dinv_factor;
 
     DM da;
@@ -56,13 +57,13 @@ typedef struct {
     Vec xkprev;
     Vec xk;
     Vec fkprev;  
-}AAR_OBJ;
+}petsc_real;
 
-void Setup_and_Initialize(AAR_OBJ* pAAR, int argc, char **argv);
-void ObjectInitialize(AAR_OBJ* pAAR);
-void Read_parameters(AAR_OBJ* pAAR, int argc, char **argv);
-void Objects_Create(AAR_OBJ* pAAR);
-void ComputeMatrixA(AAR_OBJ* pAAR);
-void Objects_Destroy(AAR_OBJ* pAAR);
+void Setup_and_Initialize(petsc_real* system, int argc, char **argv);
+void ObjectInitialize(petsc_real* system);
+void Read_parameters(petsc_real* system, int argc, char **argv);
+void Objects_Create(petsc_real* system);
+void ComputeMatrixA(petsc_real* system);
+void Objects_Destroy(petsc_real* system);
 
 #endif

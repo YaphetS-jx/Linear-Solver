@@ -13,11 +13,11 @@
 void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
 {
-    int rank, iter = 1;
+    int iter = 1, k;
     double b_2norm, r_2norm, t0, t1;
-    t0=MPI_Wtime();
+    t0 = MPI_Wtime();
 
-    Vec x_old, res, r, *DX, *DF, f_old;
+    Vec x_old, res, f_old, *DX, *DF;
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6];
@@ -26,7 +26,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
     local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
 
     // Set up precondition context
@@ -55,11 +54,12 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
     // res = b- A * x
     MatMult(A,x,res); 
-    VecAYPX(res, (PetscScalar)(-1.0),b);
+    VecAYPX(res, -1.0, b);
     VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
     PetscPrintf(PETSC_COMM_WORLD,"relres: %lf\n", r_2norm/b_2norm);
+    double t2, t3, ta=0;
 #endif
 
     while (r_2norm > tol && iter <= max_iter){
@@ -67,12 +67,12 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
         precondition(prec, res, da, blockinfo, local);
         
         if (iter > 1){
-            int k = (iter-2) % m;
+            k = (iter-2) % m;
             VecWAXPY(DX[k], -1.0, x_old, x);    // DX[k] = x   - x_old
             VecWAXPY(DF[k], -1.0, f_old, res);  // DF[k] = res - f_old
         }
 
-        VecCopy(x,x_old);                       // x_old = x
+        VecCopy(x, x_old);                      // x_old = x
         VecCopy(res, f_old);                    // f_old = res
 
         if (iter % p){
@@ -84,11 +84,19 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
             /***********************************
              *  Anderson extrapolation update  *
              ***********************************/
-            Anderson(DX, DF, da, x, res, m, beta);
+#ifdef DEBUG            
+    t2 = MPI_Wtime();
+#endif
+            Anderson(DX, DF, x, res, m, beta);
+            
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    ta += (t3 - t2);
+#endif
         }
 
         MatMult(A,x,res);                       // res = b- A * x
-        VecAYPX(res, (PetscScalar)(-1.0),b);
+        VecAYPX(res, -1.0,b);
         VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG        
@@ -105,6 +113,9 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
     t1=MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by AAR = %.4f seconds.\n",t1-t0);
+#ifdef DEBUG
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Anderson update = %.4f seconds.\n",ta);
+#endif
 
     // deallocate memory
     VecDestroy(&x_old);
@@ -171,13 +182,14 @@ void precondition(PC prec, Vec res, DM da, PetscInt *blockinfo, PetscScalar *loc
  *          x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*res));
  */
 
-void Anderson(Vec *DX, Vec *DF, DM da, Vec x, Vec res, PetscInt m, PetscScalar beta)
+void Anderson(Vec *DX, Vec *DF, Vec x, Vec res, PetscInt m, PetscScalar beta)
 {
     int lprank, i, j;
     Vec DXDF;
     double *svec = malloc(m * sizeof(double));
     PetscScalar * DFtDF = malloc(m*m * sizeof(PetscScalar));    // DFtDF = DF' * DF
     PetscScalar * DFres = malloc(m * sizeof(PetscScalar));      // DFres = DF' * res
+    assert(svec != NULL && DFtDF != NULL && DFres != NULL);
     /////////////////////////////////////////////////
 
     for (i=0; i<m; i++)
@@ -201,8 +213,9 @@ void Anderson(Vec *DX, Vec *DF, DM da, Vec x, Vec res, PetscInt m, PetscScalar b
     VecAXPY(x, beta, res);                                      // x = x + beta * res
 
     // deallocate memory
-    free(DFtDF);
     free(svec);
+    free(DFtDF);
+    free(DFres);
     VecDestroy(&DXDF);
 }
 

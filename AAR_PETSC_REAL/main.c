@@ -10,37 +10,53 @@
 
 #include "system.h"
 #include "AAR_Real.h"
+#include "PGR_Real.h"
+#include "PL2R_Real.h"
 
 int main( int argc, char **argv ) {
     int ierr; 
-    AAR_OBJ aar;
+    petsc_real system;
     PetscReal t0,t1;
 
     PetscInitialize(&argc,&argv,(char*)0,help);
 
-    t0=MPI_Wtime();
+    t0 = MPI_Wtime();
 
-    Setup_and_Initialize(&aar, argc, argv);
+    Setup_and_Initialize(&system, argc, argv);
 
     // Compute RHS and Matrix for the Poisson equation
-    ComputeMatrixA(&aar);     
-    // Matrix, A = paar->poissonOpr
-    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "paar->poissonOpr" and right hand side through "paar->RHS". 
+    ComputeMatrixA(&system);     
+    // Matrix, A = psystem->poissonOpr
+    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "psystem->poissonOpr" and right hand side through "psystem->RHS". 
 
-    t1=MPI_Wtime();
+    t1 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
 
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
-    // -------------- AAR solver --------------------------
-    AAR(aar.poissonOpr, aar.Phi, aar.RHS, aar.omega_aar, 
-        aar.beta_aar, aar.m_aar, aar.p_aar, aar.solver_tol, 2000, aar.pc, aar.da);
-    // AAR with preconditioning PC=0={Jacobi}, PC=1={ICC(0) block-Jacobi}     
+    // preconditioning PC=0={Jacobi}, PC=1={ICC(0) block-Jacobi}     
+    if (system.solver == 0)
+        // -------------- AAR solver --------------------------
+        AAR(system.poissonOpr, system.Phi, system.RHS, system.omega, 
+            system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        
+    else if (system.solver == 1)
+        // -------------- PGR solver --------------------------
+        PGR(system.poissonOpr, system.Phi, system.RHS, system.omega, 
+            system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        
+    else 
+        // -------------- PL2R solver --------------------------
+        PL2R(system.poissonOpr, system.Phi, system.RHS, system.omega, 
+            system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+    double testnorm;
+    VecNorm(system.Phi, NORM_2, &testnorm);
+    PetscPrintf(PETSC_COMM_WORLD,"test: %g\n",testnorm);
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
-    t1=MPI_Wtime();
+    t1 = MPI_Wtime();
 
-    Objects_Destroy(&aar);  
+    Objects_Destroy(&system);  
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
     ierr = PetscFinalize();
     CHKERRQ(ierr);

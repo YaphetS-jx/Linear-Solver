@@ -18,6 +18,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
 void precondition(PC prec, Vec res, DM da, PetscInt *blockinfo, PetscScalar *local);
 
-void Anderson(Vec *DX, Vec *DF, DM da, Vec x, Vec res, PetscInt m, PetscScalar beta);
+void Anderson(Vec *DX, Vec *DF, Vec x, Vec res, PetscInt m, PetscScalar beta);
 
 #endif
