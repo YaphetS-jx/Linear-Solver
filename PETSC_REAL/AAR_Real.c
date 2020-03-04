@@ -1,6 +1,7 @@
 /**
  * @file    AAR_Real.c
- * @brief   This file contains AAR_Real solver and its required functions
+ * @brief   This file contains Alternating Anderson Richardson solver and
+ *          its required functions
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -13,19 +14,20 @@
 void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
 {
-    int iter = 1, k;
+    int iter = 1, k, i;
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, f_old, *DX, *DF;
+    Vec x_old, res, f_old, *DX, *DF, DXDF;
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6];
-    PetscScalar *local;
+    PetscScalar *local, *DFres;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
     local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
+    DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
 
     // Set up precondition context
@@ -46,6 +48,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDuplicate(x, &x_old);
     VecDuplicate(x, &res); 
     VecDuplicate(x, &f_old); 
+    VecDuplicate(x, &DXDF);
     VecDuplicateVecs(x, m, &DX);                // storage for delta x
     VecDuplicateVecs(x, m, &DF);                // storage for delta residual 
  
@@ -87,7 +90,14 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 #ifdef DEBUG            
     t2 = MPI_Wtime();
 #endif
-            Anderson(DX, DF, x, res, m, beta);
+            Anderson(DFres, DF, res, m);
+
+            for (i=0; i<m; i++){                                        // x = x - (DX + beta*DF)' * DFres
+                VecWAXPY(DXDF, beta, DF[i], DX[i]);
+                VecAXPY(x, -DFres[i], DXDF);                            
+            }
+
+            VecAXPY(x, beta, res);                                      // x = x + beta * res
             
 #ifdef DEBUG
     t3 = MPI_Wtime();
@@ -121,9 +131,11 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDestroy(&x_old);
     VecDestroy(&res);
     VecDestroy(&f_old);
+    VecDestroy(&DXDF);
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);
+    free(DFres);
 }
 
 /**
@@ -182,13 +194,11 @@ void precondition(PC prec, Vec res, DM da, PetscInt *blockinfo, PetscScalar *loc
  *          x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*res));
  */
 
-void Anderson(Vec *DX, Vec *DF, Vec x, Vec res, PetscInt m, PetscScalar beta)
+void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m)
 {
     int lprank, i, j;
-    Vec DXDF;
     double *svec = malloc(m * sizeof(double));
     PetscScalar * DFtDF = malloc(m*m * sizeof(PetscScalar));    // DFtDF = DF' * DF
-    PetscScalar * DFres = malloc(m * sizeof(PetscScalar));      // DFres = DF' * res
     assert(svec != NULL && DFtDF != NULL && DFres != NULL);
     /////////////////////////////////////////////////
 
@@ -204,18 +214,8 @@ void Anderson(Vec *DX, Vec *DF, Vec x, Vec res, PetscInt m, PetscScalar beta)
     // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DFtDF, m, DFres, m, svec, -1.0, &lprank);
 
-    VecDuplicate(x, &DXDF);
-    for (i=0; i<m; i++){                                        // x = x - (DX + beta*DF)' * DFres
-        VecWAXPY(DXDF, beta, DF[i], DX[i]);
-        VecAXPY(x, -DFres[i], DXDF);                            
-    }
-
-    VecAXPY(x, beta, res);                                      // x = x + beta * res
-
     // deallocate memory
     free(svec);
     free(DFtDF);
-    free(DFres);
-    VecDestroy(&DXDF);
 }
 

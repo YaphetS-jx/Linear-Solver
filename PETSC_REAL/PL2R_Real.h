@@ -1,6 +1,6 @@
 /**
  * @file    PL2R_Real.h
- * @brief   This file declares the functions for PL2R solver. 
+ * @brief   This file declares the functions for Periodic L2_Richardson solver. 
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -16,6 +16,6 @@
 void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
 
-void L2_Richardson(Vec *DX, Vec *DF, Vec x, Vec x_old, Vec res, Vec f_old, PetscInt m, int k);
+void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m);
 
 #endif

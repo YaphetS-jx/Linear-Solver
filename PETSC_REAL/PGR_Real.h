@@ -1,6 +1,6 @@
 /**
  * @file    PRG_Real.h
- * @brief   This file declares the functions for PGR solver. 
+ * @brief   This file declares the functions for Periodic Galerkin Richardson solver. 
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -16,6 +16,6 @@
 void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
 
-void Galerkin_Richardson(Vec *DX, Vec *DF, Vec x, Vec x_old, Vec res, Vec f_old, PetscInt m, int k);
+void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m);
 
 #endif

@@ -1,6 +1,6 @@
 /**
  * @file    AAR_Real.h
- * @brief   This file declares the functions for AAR solver. 
+ * @brief   This file declares the functions for Alternating Anderson Richardson solver. 
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -18,6 +18,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
 void precondition(PC prec, Vec res, DM da, PetscInt *blockinfo, PetscScalar *local);
 
-void Anderson(Vec *DX, Vec *DF, Vec x, Vec res, PetscInt m, PetscScalar beta);
+void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m);
 
 #endif

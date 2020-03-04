@@ -13,21 +13,22 @@
 void PGR(Mat A, Vec x, Vec b, PetscScalar omega, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
 {
-    int iter = 1, k; 
+    int iter = 1, k, i; 
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, f_old, *DX, *DF;
+    Vec x_old, res, f_old, *DX, *DF, Ax, Ax_prev;
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6];
-    PetscScalar *local;
+    PetscScalar *local, * DXres;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
     local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
-    assert(local != NULL);
-    MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
+    DXres = calloc(m, sizeof(PetscScalar));       // DFres = DF' * res
+    assert(local != NULL && DXres != NULL);
+    MatGetDiagonalBlock(A,&Dblock);               // diagonal block of matrix A
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF,&prec);
@@ -47,15 +48,17 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     VecDuplicate(x, &x_old); 
     VecDuplicate(x, &res); 
     VecDuplicate(x, &f_old); 
-    VecDuplicateVecs(x, m, &DX);                // storage for delta x
-    VecDuplicateVecs(x, m, &DF);                // storage for delta residual 
+    VecDuplicate(x, &Ax); 
+    VecDuplicate(x, &Ax_prev); 
+    VecDuplicateVecs(x, m, &DX);                  // storage for delta x
+    VecDuplicateVecs(x, m, &DF);                  // storage for delta residual 
  
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
 
     // res = b- A * x
-    MatMult(A, x, res); 
-    VecAYPX(res, -1.0, b);
+    MatMult(A, x, Ax); 
+    VecWAXPY(res, -1.0, Ax, b);
     VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
@@ -69,35 +72,45 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
 
         VecCopy(x, x_old);
         VecCopy(res, f_old); 
+        VecCopy(Ax, Ax_prev); 
         
         if (iter == 1)
             k = m - 1;
         else
             k = (iter-2) % m;
 
-        VecAXPY(x, omega, res);               // x = x + omega * res
-        VecWAXPY(DX[k], -1.0, x_old, x);      // DX[k] = x - x_old        
-        MatMult(A, x, res); 
+        VecAXPY(x, omega, res);                    // x = x + omega * res
+        VecWAXPY(DX[k], -1.0, x_old, x);           // DX[k] = x - x_old        
 
-        VecAYPX(res, -1.0, b);
-        VecWAXPY(DF[k], -1.0, res, f_old);    // DF[k] = f_old - res
+        MatMult(A, x, Ax); 
+        VecWAXPY(res, -1.0, Ax, b);
+        VecWAXPY(DF[k], -1.0, Ax_prev, Ax);        // DF[k] = Ax - Ax_prev
 
 #ifdef DEBUG            
     t2 = MPI_Wtime();
 #endif
         if (iter % p == 0){
-
             /***********************
              *  Galerkin-Richardson  *
              ***********************/
-            Galerkin_Richardson(DX, DF, x, x_old, res, f_old, m, k);
+            Galerkin_Richardson(DXres, DX, DF, res, m);
+
+            for (i=0; i<m; i++)                    // x = x + DX' * DXres
+                VecAXPY(x, DXres[i], DX[i]);                       
+
+            VecWAXPY(DX[k], -1.0, x_old, x);       // update DX[k] = x - x_old 
+
+            for (i=0; i<m; i++)                    // Ax = Ax + DF' * DXres
+                VecAXPY(Ax, DXres[i], DF[i]);
+
+            VecWAXPY(DF[k], -1.0, Ax_prev, Ax);    // update DF[k] = Ax - Ax_prev
         }
         
 #ifdef DEBUG
     t3 = MPI_Wtime();
     ta += (t3 - t2);
 #endif
-
+        VecWAXPY(res, -1.0, Ax, b);
         VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG        
@@ -125,6 +138,7 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);
+    free(DXres);
 }
 
 /**
@@ -133,37 +147,26 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
  *          x_new = x_prev + DX * (pinv(DX'*DF)*(DX'*res));
  */
 
-void Galerkin_Richardson(Vec *DX, Vec *DF, Vec x, Vec x_old, Vec res, Vec f_old, PetscInt m, int k)
+void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m)
 {
     int lprank, i, j;
     double *svec = malloc(m * sizeof(double));
     PetscScalar * DXtDF = malloc(m*m * sizeof(PetscScalar));    // DFtDF = DF' * DF
-    PetscScalar * DXres = malloc(m * sizeof(PetscScalar));      // DFres = DF' * res
-    assert(svec != NULL && DXtDF != NULL && DXres != NULL);
+    assert(svec != NULL && DXtDF != NULL);
     /////////////////////////////////////////////////
 
     for (i=0; i<m; i++)
         for(j=0; j<m; j++)
             VecTDot(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
-        
+    
     for (i=0; i<m; i++)
         VecTDot(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
 
     // Least square problem solver. DXres = pinv(DX'*DF)*(DX'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DXtDF, m, DXres, m, svec, -1.0, &lprank);
 
-    for (i=0; i<m; i++)                                         // x = x + DX' * DXres
-        VecAXPY(x, DXres[i], DX[i]);                            
-
-    VecWAXPY(DX[k], -1.0, x_old, x);      // update DX[k] = x - x_old 
-
-    for (i=0; i<m; i++)                                         // x = x + DX' * DXres
-        VecAXPY(res, -DXres[i], DF[i]);
-    VecWAXPY(DF[k], -1.0, res, f_old);    // DF[k] = f_old - res 
-
     // deallocate memory
     free(svec);
     free(DXtDF);
-    free(DXres);
 }
 

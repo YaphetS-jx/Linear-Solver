@@ -1,6 +1,7 @@
     
 /*=============================================================================================
-| Alternating Anderson Richardson (AAR) code for real-valued systems
+| Alternating Anderson Richardson (AAR), Periodic Galerkin Richardson (PGR), 
+| Periodic L2 Richardson (PL2R) code and tests in real-valued systems.
 | Copyright (C) 2020 Material Physics & Mechanics Group at Georgia Tech.
 | 
 | Authors: Xin Jing, Phanish Suryanarayana
@@ -33,8 +34,7 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
 
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
-
-    // preconditioning PC=0={Jacobi}, PC=1={ICC(0) block-Jacobi}     
+    
     if (system.solver == 0)
         // -------------- AAR solver --------------------------
         AAR(system.poissonOpr, system.Phi, system.RHS, system.omega, 
@@ -51,11 +51,14 @@ int main( int argc, char **argv ) {
             system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
 
 #ifdef DEBUG
-    double x_norm;
+    double A_norm, b_norm, x_norm;
+    MatNorm(system.poissonOpr, NORM_FROBENIUS, &A_norm);
+    VecNorm(system.RHS, NORM_2, &b_norm);
     VecNorm(system.Phi, NORM_2, &x_norm);
-    PetscPrintf(PETSC_COMM_WORLD,"test: %g\n",x_norm);
+    PetscPrintf(PETSC_COMM_WORLD,"Norm A: %g, b: %g, x: %g\n",A_norm, b_norm, x_norm);
 #endif
-    VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
+
+    // VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
     t1 = MPI_Wtime();
