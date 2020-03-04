@@ -49,9 +49,13 @@ int main( int argc, char **argv ) {
         // -------------- PL2R solver --------------------------
         PL2R(system.poissonOpr, system.Phi, system.RHS, system.omega, 
             system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
-    double testnorm;
-    VecNorm(system.Phi, NORM_2, &testnorm);
-    PetscPrintf(PETSC_COMM_WORLD,"test: %g\n",testnorm);
+
+#ifdef DEBUG
+    double x_norm;
+    VecNorm(system.Phi, NORM_2, &x_norm);
+    PetscPrintf(PETSC_COMM_WORLD,"test: %g\n",x_norm);
+#endif
+    VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
     t1 = MPI_Wtime();

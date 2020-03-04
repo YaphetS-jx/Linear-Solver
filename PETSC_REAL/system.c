@@ -16,9 +16,9 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscInt p,i;
     PetscReal Nr, Dr, val;
 
-    system->order = 3; 
+    system->order = 1; 
     // store half order
-    system->numPoints_x = 48; system->numPoints_y = 48; system->numPoints_z = 48;
+    system->numPoints_x = 8; system->numPoints_y = 8; system->numPoints_z = 8;
 
     if (argc < 8) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n");
@@ -149,6 +149,8 @@ void Objects_Create(petsc_real* system) {
 
     PetscRandomDestroy(&rnd);
 
+    // VecView(system->RHS, PETSC_VIEWER_STDOUT_WORLD);
+
     // Initial random guess
     PetscRandomCreate(PETSC_COMM_WORLD,&rnd);
     PetscRandomSetFromOptions(rnd);
@@ -249,5 +251,5 @@ void ComputeMatrixA(petsc_real* system) {
     MatAssemblyBegin(system->poissonOpr, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(system->poissonOpr, MAT_FINAL_ASSEMBLY); 
 
-    // MatView(system->poissonOpr,PETSC_VIEWER_STDOUT_WORLD);
+    MatView(system->poissonOpr, PETSC_VIEWER_DRAW_WORLD);
 }
