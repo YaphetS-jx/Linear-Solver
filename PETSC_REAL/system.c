@@ -99,13 +99,8 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
 /*****************************************************************************/
 
 void Setup_and_Initialize(petsc_real* system, int argc, char **argv) {
-    ObjectInitialize(system); 
     Read_parameters(system, argc, argv); 
     Objects_Create(system);      
-}
-
-void ObjectInitialize(petsc_real* system) {
-    PetscOptionsGetString(PETSC_NULL, "-name", system->file, sizeof(system->file), PETSC_NULL); 
 }
 
 void Objects_Create(petsc_real* system) {
@@ -121,8 +116,9 @@ void Objects_Create(petsc_real* system) {
     PetscMPIInt comm_size; 
     MPI_Comm_size(PETSC_COMM_WORLD, &comm_size); 
 
-    DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
+    PetscErrorCode ieer = DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
     PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, 1, o, 0, 0, 0, &system->da);        // create a pattern and communication layout
+    DMSetUp(system->da);
 
     DMCreateGlobalVector(system->da, &system->RHS);                          // using the layour of da to create vectors RHS
     VecDuplicate(system->RHS, &system->Phi);                                 // create Phi by duplicating the pattern of RHS
@@ -142,7 +138,6 @@ void Objects_Create(petsc_real* system) {
     PetscRandomSeed(rnd); 
 
     VecSetRandom(system->RHS, rnd); 
-
     VecSum(system->RHS, &RHSsum); 
     RHSsum = -RHSsum/(n_x*n_y*n_z); 
     VecShift(system->RHS, RHSsum); 

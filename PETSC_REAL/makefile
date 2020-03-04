@@ -7,8 +7,13 @@ SOURCEC = ./main.c system.c AAR_Real.c PGR_Real.c PL2R_Real.c
 OBJSC = ./main.o system.o AAR_Real.o PGR_Real.o PL2R_Real.o 
 LIBBASE = ./petsc_real
 
-include ${PETSC_DIR}/conf/variables
-include ${PETSC_DIR}/conf/rules
+# For PETSC 3.11.3
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+
+# For PETSC 3.5.3
+# include ${PETSC_DIR}/conf/variables
+# include ${PETSC_DIR}/conf/rules
 
 system: ${OBJSC} chkopts
 	${CLINKER} -o ${LIBBASE} ${OBJSC} ${PETSC_LIB} 

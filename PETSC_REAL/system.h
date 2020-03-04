@@ -32,13 +32,9 @@ typedef struct {
     PetscInt  numPoints_x;
     PetscInt  numPoints_y;
     PetscInt  numPoints_z;
-    PetscInt  order; 
-    // half FD order
+    PetscInt  order;        // half FD order
     PetscInt pc;     
-    // S = Slock-jacobi or S = Sacobi
     PetscReal coeffs[MAX_ORDER+1];
-
-    char file[30];    
 
     PetscInt solver;
     PetscReal solver_tol;
@@ -60,7 +56,6 @@ typedef struct {
 }petsc_real;
 
 void Setup_and_Initialize(petsc_real* system, int argc, char **argv);
-void ObjectInitialize(petsc_real* system);
 void Read_parameters(petsc_real* system, int argc, char **argv);
 void Objects_Create(petsc_real* system);
 void ComputeMatrixA(petsc_real* system);
