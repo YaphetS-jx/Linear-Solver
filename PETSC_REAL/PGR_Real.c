@@ -149,6 +149,7 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     VecDestroyVecs(m, &DF);
     free(local);
     free(DXres);
+    PCDestroy(&prec);
 }
 
 /**

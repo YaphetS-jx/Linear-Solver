@@ -17,7 +17,11 @@
 int main( int argc, char **argv ) {
     int ierr; 
     petsc_real system;
-    PetscReal t0,t1;
+    PetscReal t0,t1, t2, t3;
+
+    PetscInt iteration;
+    KSP ksp;
+    PC pc;
 
     PetscInitialize(&argc,&argv,(char*)0,help);
 
@@ -28,7 +32,8 @@ int main( int argc, char **argv ) {
     // Compute RHS and Matrix for the Poisson equation
     ComputeMatrixA(&system);     
     // Matrix, A = psystem->poissonOpr
-    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "psystem->poissonOpr" and right hand side through "psystem->RHS". 
+    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "psystem->poissonOpr"
+    // and right hand side through "psystem->RHS". 
 
     t1 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
@@ -61,8 +66,38 @@ int main( int argc, char **argv ) {
     // VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
-    t1 = MPI_Wtime();
+    t2 = MPI_Wtime();
 
+    KSPCreate(PETSC_COMM_WORLD, &ksp);
+
+    KSPSetOperators(ksp, system.poissonOpr, system.poissonOpr);
+    KSPGetPC(ksp,&pc);
+
+    if (system.pc == 1) {
+        PCSetType(pc, PCBJACOBI); 
+        PetscPrintf(PETSC_COMM_WORLD,"GMRES preconditioned with Block-Jacobi using ILU(0).\n");
+    }
+    else {
+        PCSetType(pc, PCJACOBI); 
+        PetscPrintf(PETSC_COMM_WORLD,"GMRES preconditioned with Jacobi.\n");
+    }
+
+    KSPSetPC(ksp, pc);
+    KSPSetType(ksp, KSPGMRES);
+    KSPSetTolerances(ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, 2000);
+    KSPSetInitialGuessNonzero(ksp, PETSC_TRUE);
+    KSPSetFromOptions(ksp);
+
+    KSPSolve(ksp, system.RHS, system.Initial);
+
+    KSPGetIterationNumber(ksp, &iteration);
+    
+    t3 = MPI_Wtime();
+    PetscPrintf(PETSC_COMM_WORLD,"GMRES Iterations %D, Time: %.4f seconds.\n",iteration, (t3-t2));
+
+    KSPDestroy(&ksp);
+
+    t1 = MPI_Wtime();
     Objects_Destroy(&system);  
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
     ierr = PetscFinalize();

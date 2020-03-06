@@ -146,6 +146,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDestroyVecs(m, &DF);
     free(local);
     free(DFres);
+    PCDestroy(&prec);
 }
 
 /**
