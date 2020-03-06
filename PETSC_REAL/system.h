@@ -49,7 +49,8 @@ typedef struct {
     DM da;
     Vec RHS;
     Vec Phi;
-    Vec Initial;
+    Vec GMRES;
+    Vec BICG;
 
     Mat poissonOpr;   
 

@@ -67,7 +67,6 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
     t2 = MPI_Wtime();
-
     KSPCreate(PETSC_COMM_WORLD, &ksp);
 
     KSPSetOperators(ksp, system.poissonOpr, system.poissonOpr);
@@ -88,17 +87,33 @@ int main( int argc, char **argv ) {
     KSPSetInitialGuessNonzero(ksp, PETSC_TRUE);
     KSPSetFromOptions(ksp);
 
-    KSPSolve(ksp, system.RHS, system.Initial);
+    KSPSolve(ksp, system.RHS, system.GMRES);
 
     KSPGetIterationNumber(ksp, &iteration);
     
     t3 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"GMRES Iterations %D, Time: %.4f seconds.\n",iteration, (t3-t2));
 
+    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+
+    if (system.pc == 1) 
+        PetscPrintf(PETSC_COMM_WORLD,"BICG preconditioned with Block-Jacobi using ILU(0).\n");
+    else 
+        PetscPrintf(PETSC_COMM_WORLD,"BICG preconditioned with Jacobi.\n");
+    
+    t2 = MPI_Wtime();
+    KSPSetType(ksp, KSPBICG);
+    KSPSolve(ksp, system.RHS, system.BICG);
+    KSPGetIterationNumber(ksp, &iteration);
+    t3 = MPI_Wtime();
+    PetscPrintf(PETSC_COMM_WORLD,"BICG Iterations %D, Time: %.4f seconds.\n",iteration, (t3-t2));
+    
+
     KSPDestroy(&ksp);
 
     t1 = MPI_Wtime();
     Objects_Destroy(&system);  
+    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
     ierr = PetscFinalize();
     CHKERRQ(ierr);

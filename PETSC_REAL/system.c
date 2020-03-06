@@ -122,7 +122,8 @@ void Objects_Create(petsc_real* system) {
 
     DMCreateGlobalVector(system->da, &system->RHS);                          // using the layour of da to create vectors RHS
     VecDuplicate(system->RHS, &system->Phi);                                 // create Phi by duplicating the pattern of RHS
-    VecDuplicate(system->RHS, &system->Initial);                             // create Initial by duplicating the pattern of RHS
+    VecDuplicate(system->RHS, &system->GMRES);                               // create Initial by duplicating the pattern of RHS
+    VecDuplicate(system->RHS, &system->BICG);                                // create Initial by duplicating the pattern of RHS
 
     PetscRandom rnd; 
     unsigned long seed; 
@@ -154,8 +155,9 @@ void Objects_Create(petsc_real* system) {
     PetscRandomSetSeed(rnd, seed); 
     PetscRandomSeed(rnd); 
 
-    VecSetRandom(system->Initial, rnd); 
-    VecCopy(system->Initial, system->Phi);
+    VecSetRandom(system->Phi, rnd); 
+    VecCopy(system->Phi, system->GMRES);
+    VecCopy(system->Phi, system->BICG);
 
     PetscRandomDestroy(&rnd); 
 
