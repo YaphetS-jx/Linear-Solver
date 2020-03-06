@@ -1,7 +1,7 @@
 Instructions to run the Petsc_Real code:
 This code is for solving real-valued systems of equations using the AAR, PGR and PL2R method, with the Poisson equation provided as an example.  
 
-(1) Modules required to compile the code:intel/15.0, mvapich2/2.1, fftw/3.3.4, mkl/11.2, petsc/3.5.3
+(1) Modules required to compile the code:intel/19.0.3, mvapich2/2.3.1, mkl/11.2, petsc/3.11.3
 
 (2) Compile the code by typing "make" in the root directory $PETSC_REAL.
     
@@ -14,13 +14,13 @@ This code is for solving real-valued systems of equations using the AAR, PGR and
     m - solver parameter (history)
     p - solver parameter (frequency of Anderson extrapolation, if p_aar=1, then it is AR)
     omega - solver parameter (Richardson relaxation)
-    beta - solver parameter (Anderson relaxation) (no beta for PL2R, any number in input is fine)
+    beta - solver parameter (Anderson relaxation) (no beta for PGR and PL2R, any number in input is fine)
     
 (5) Running the code: (e.g. for 8 processors)
 
         #mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n np ./petsc_real solver pc tol m p omega beta 
         mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./petsc_real 0 0 1e-6 13 11 1.0 0.9 -log_summary>test.out
 	   
-(6) The executable (petsc_real) is created in the root directory and the source code is in main.c system.c(.h) AAR_Real.c(.h) PGR_Real.c(.h) PL2R_Real.c(.h)
+(6) The executable (petsc_real) is created in the root directory and the source code is in main.c system.c(.h) tools.c(h) AAR_Real.c(.h) PGR_Real.c(.h) PL2R_Real.c(.h)
 
 

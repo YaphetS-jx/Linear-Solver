@@ -160,56 +160,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 }
 
 /**
- * @brief   precondition function
- *
- *          Apply Jacobian or ICC(0) (Block Jacobian).
- *          res = M \ res
- *          M is precondition matrix
- */
-
-void precondition(PC prec, Vec res, DM da, PetscInt *blockinfo, PetscScalar *local)
-{
-
-    int i, j, k, t, rank;
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-    PetscInt xcor = blockinfo[0], ycor = blockinfo[1], zcor = blockinfo[2], 
-              lxdim = blockinfo[3], lydim = blockinfo[4], lzdim = blockinfo[5];
-
-    PetscInt Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
-    PetscScalar ***r;
-    Vec localv, f;
-    /////////////////////////////////////////////////
-
-    DMDAVecGetArray(da, res, &r);                                 // r is the ghosted local vectors of res
-
-    // Extract local values
-    t = 0;
-    for (k = zcor; k < lzdim+zcor; k++)
-        for (j = ycor; j < lydim+ycor; j++)
-            for (i = xcor; i < lxdim+xcor; i++)
-                local[t++] = r[k][j][i];
-
-    VecCreateSeqWithArray(MPI_COMM_SELF, 1, Np, local, &localv); // Create local vector with extracted value
-
-    VecDuplicate(localv, &f);
-    PCApply(prec, localv, f);                                    // f = M \ localv
-
-    VecGetArray(f, &local);                                      // Get preconditioned residual
-
-    // update local residual
-    t = 0;
-    for (k = zcor; k < lzdim+zcor; k++)
-        for (j = ycor; j < lydim+ycor; j++)
-            for (i = xcor; i < lxdim+xcor; i++)
-                r[k][j][i] = local[t++];
-    DMDAVecRestoreArray(da, res, &r);
-
-    // deallocate memory
-    VecDestroy(&localv);
-    VecDestroy(&f);
-}
-
-/**
  * @brief   Anderson update
  *
  *          x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*res));
@@ -246,6 +196,4 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m)
     free(svec);
     free(DFtDF);
 }
-
-
 
