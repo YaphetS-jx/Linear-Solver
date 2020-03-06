@@ -11,7 +11,9 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-static char help[] = "Alternating Anderson Richardson (AAR) code\n";
+static char help[] = "Alternating Anderson Richardson (AAR) code\n"
+                        "Periodic Galerkin Richardson (PGR) code\n"
+                        "Periodic L2-Richardson (PL2R) code\n";
 
 #include "petsc.h"
 #include "petscksp.h"
@@ -47,6 +49,7 @@ typedef struct {
     DM da;
     Vec RHS;
     Vec Phi;
+    Vec Initial;
 
     Mat poissonOpr;   
 
