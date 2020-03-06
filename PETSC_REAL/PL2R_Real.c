@@ -9,6 +9,7 @@
  */
 
 #include "PL2R_Real.h"
+#include "tools.h"
 
 void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
@@ -17,16 +18,17 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, f_old, *DX, *DF, Ax, Ax_prev;
+    Vec x_old, res, res_local, pres_local, f_old, *DX, *DF, Ax, Ax_prev;
     PC prec;
     Mat Dblock;
-    PetscInt blockinfo[6];
-    PetscScalar *local;
+    PetscInt blockinfo[6], Np;
+    PetscScalar *local, *DFres, ***r;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
-    local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
-    PetscScalar * DFres = calloc(m , sizeof(PetscScalar));      // DFres = DF' * res
+    Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
+    local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
+    DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));      // DFres = DF' * res
     assert(local != NULL && DFres != NULL);
     MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
 
@@ -68,7 +70,10 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
-        precondition(prec, res, da, blockinfo, local);
+        GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
+        VecDuplicate(res_local, &pres_local);
+        PCApply(prec, res_local, pres_local);
+        RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
 
         VecCopy(x, x_old);
         VecCopy(res, f_old); 
@@ -135,6 +140,8 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     // deallocate memory
     VecDestroy(&res);
     VecDestroy(&f_old);
+    VecDestroy(&res_local);
+    VecDestroy(&pres_local);
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);
@@ -156,13 +163,20 @@ void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m)
     /////////////////////////////////////////////////
 
     for (i=0; i<m; i++)
+        for(j=0; j<i+1; j++)
+            VecTDotBegin(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+        
+    for (i=0; i<m; i++)
+        VecTDotBegin(DF[i], res, &DFres[i]);                         // DFres(i)   = DF[i]' * res
+
+    for (i=0; i<m; i++)
         for(j=0; j<i+1; j++){
-            VecTDot(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+            VecTDotEnd(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
             DFtDF[i+m*j] = DFtDF[m*i+j];                        // DFtDF(j,i) = DFtDF(i,j) symmetric 
         }
         
     for (i=0; i<m; i++)
-        VecTDot(DF[i], res, &DFres[i]);                         // DFres(i)   = DF[i]' * res
+        VecTDotEnd(DF[i], res, &DFres[i]);                         // DFres(i)
 
     // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DFtDF, m, DFres, m, svec, -1.0, &lprank);

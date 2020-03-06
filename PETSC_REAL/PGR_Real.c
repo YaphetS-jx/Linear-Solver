@@ -9,6 +9,7 @@
  */
 
 #include "PGR_Real.h"
+#include "tools.h"
 
 void PGR(Mat A, Vec x, Vec b, PetscScalar omega, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
@@ -17,16 +18,17 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, f_old, *DX, *DF, Ax, Ax_prev;
+    Vec x_old, res, res_local, pres_local, f_old, *DX, *DF, Ax, Ax_prev;
     PC prec;
     Mat Dblock;
-    PetscInt blockinfo[6];
-    PetscScalar *local, * DXres;
+    PetscInt blockinfo[6], Np;
+    PetscScalar *local, * DXres, ***r;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
-    local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
-    DXres = calloc(m, sizeof(PetscScalar));       // DFres = DF' * res
+    Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
+    local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
+    DXres = (PetscScalar *) calloc (m , sizeof(PetscScalar));       // DFres = DF' * res
     assert(local != NULL && DXres != NULL);
     MatGetDiagonalBlock(A,&Dblock);               // diagonal block of matrix A
 
@@ -68,7 +70,13 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
-        precondition(prec, res, da, blockinfo, local);
+        GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
+        // precondition(prec, res, da, blockinfo, local);
+
+        VecDuplicate(res_local, &pres_local);
+        PCApply(prec, res_local, pres_local);
+        RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
+
 
         VecCopy(x, x_old);
         VecCopy(res, f_old); 
@@ -135,6 +143,8 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     // deallocate memory
     VecDestroy(&res);
     VecDestroy(&f_old);
+    VecDestroy(&res_local);
+    VecDestroy(&pres_local);
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);
@@ -157,10 +167,17 @@ void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscIn
 
     for (i=0; i<m; i++)
         for(j=0; j<m; j++)
-            VecTDot(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+            VecTDotBegin(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
     
     for (i=0; i<m; i++)
-        VecTDot(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
+        VecTDotBegin(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
+
+    for (i=0; i<m; i++)
+        for(j=0; j<m; j++)
+            VecTDotEnd(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+    
+    for (i=0; i<m; i++)
+        VecTDotEnd(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
 
     // Least square problem solver. DXres = pinv(DX'*DF)*(DX'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DXtDF, m, DXres, m, svec, -1.0, &lprank);
