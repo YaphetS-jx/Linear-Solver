@@ -1,4 +1,4 @@
-    
+
 /*=============================================================================================
 | Alternating Anderson Richardson (AAR), Periodic Galerkin Richardson (PGR), 
 | Periodic L2 Richardson (PL2R) code and tests in real-valued systems.
@@ -108,13 +108,11 @@ int main( int argc, char **argv ) {
     t3 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"BICG Iterations %D, Time: %.4f seconds.\n",iteration, (t3-t2));
     
-
-    KSPDestroy(&ksp);
-
     t1 = MPI_Wtime();
-    Objects_Destroy(&system);  
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
+    KSPDestroy(&ksp);
+    Objects_Destroy(&system); 
     ierr = PetscFinalize();
     CHKERRQ(ierr);
 
