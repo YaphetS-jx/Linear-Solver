@@ -20,22 +20,16 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     // store half order
     system->numPoints_x = 100; system->numPoints_y = 100; system->numPoints_z = 100; 
 
-    if (argc < 8) {
+    if (argc < 7) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n"); 
         exit(-1); 
     } else {
-        system->solver = atoi(argv[1]); 
-        system->pc = atoi(argv[2]); 
-        system->solver_tol = atof(argv[3]); 
-        system->m = atoi(argv[4]); 
-        system->p = atoi(argv[5]); 
-        system->omega = atof(argv[6]); 
-        system->beta = atof(argv[7]); 
-    }
-
-    if (system->solver >2 || system->solver <0){
-        PetscPrintf(PETSC_COMM_WORLD, "Nonexistent solver\n"); 
-        exit(-1); 
+        system->pc = atoi(argv[1]); 
+        system->solver_tol = atof(argv[2]); 
+        system->m = atoi(argv[3]); 
+        system->p = atoi(argv[4]); 
+        system->omega = atof(argv[5]); 
+        system->beta = atof(argv[6]); 
     }
 
     if (system->pc >1 || system->pc <0){
@@ -71,12 +65,11 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscPrintf(PETSC_COMM_WORLD, "***************************************************************************\n"); 
 
     //PetscPrintf(PETSC_COMM_WORLD, "FD_ORDER    : %d\n", 2*system->order); 
-    if (system->solver == 0)
-        PetscPrintf(PETSC_COMM_WORLD, "Solver      : AAR\n"); 
-    else if (system->solver == 1)
-        PetscPrintf(PETSC_COMM_WORLD, "Solver      : PGR\n"); 
-    else
-        PetscPrintf(PETSC_COMM_WORLD, "Solver      : PL2R\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : AAR\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : PGR\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : PL2R\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : GMRES\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : BICG\n"); 
     if (system->pc == 1)
         PetscPrintf(PETSC_COMM_WORLD, "system_pc   : Block-Jacobi using ICC(0)\n"); 
     else
@@ -121,8 +114,10 @@ void Objects_Create(petsc_real* system) {
     DMSetUp(system->da);
 
     DMCreateGlobalVector(system->da, &system->RHS);                          // using the layour of da to create vectors RHS
-    VecDuplicate(system->RHS, &system->Phi);                                 // create Phi by duplicating the pattern of RHS
-    VecDuplicate(system->RHS, &system->GMRES);                               // create Initial by duplicating the pattern of RHS
+    VecDuplicate(system->RHS, &system->AAR); 
+    VecDuplicate(system->RHS, &system->PGR); 
+    VecDuplicate(system->RHS, &system->PL2R);                                
+    VecDuplicate(system->RHS, &system->GMRES);                               
     VecDuplicate(system->RHS, &system->BICG);                                // create Initial by duplicating the pattern of RHS
 
     PetscRandom rnd; 
@@ -151,13 +146,15 @@ void Objects_Create(petsc_real* system) {
     // Initial random guess
     PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
     PetscRandomSetFromOptions(rnd); 
-    seed=1;  
+    seed=rank;  
     PetscRandomSetSeed(rnd, seed); 
     PetscRandomSeed(rnd); 
 
-    VecSetRandom(system->Phi, rnd); 
-    VecCopy(system->Phi, system->GMRES);
-    VecCopy(system->Phi, system->BICG);
+    VecSetRandom(system->AAR, rnd); 
+    VecCopy(system->AAR, system->PGR);
+    VecCopy(system->AAR, system->PL2R);
+    VecCopy(system->AAR, system->GMRES);
+    VecCopy(system->AAR, system->BICG);
 
     PetscRandomDestroy(&rnd); 
 
@@ -179,7 +176,7 @@ void Objects_Create(petsc_real* system) {
 void Objects_Destroy(petsc_real* system) {
     DMDestroy(&system->da); 
     VecDestroy(&system->RHS); 
-    VecDestroy(&system->Phi); 
+    VecDestroy(&system->AAR); 
     MatDestroy(&system->poissonOpr); 
 
     return; 

@@ -42,7 +42,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     else if (pc==0) {
         PCSetType(prec, PCJACOBI); 
         // AAJ
-        PetscPrintf(PETSC_COMM_WORLD, "PL2R preconditioned with Jacobi (AAJ).\n");
+        PetscPrintf(PETSC_COMM_WORLD, "PL2R preconditioned with Jacobi.\n");
     }
     PCSetOperators(prec, Dblock, Dblock);
 

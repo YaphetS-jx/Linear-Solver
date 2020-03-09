@@ -42,7 +42,7 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     else if (pc==0) {
         PCSetType(prec, PCJACOBI); 
         // AAJ
-        PetscPrintf(PETSC_COMM_WORLD, "PGR preconditioned with Jacobi (AAJ).\n");
+        PetscPrintf(PETSC_COMM_WORLD, "PGR preconditioned with Jacobi.\n");
     }
     PCSetOperators(prec, Dblock, Dblock);
 

@@ -48,7 +48,9 @@ typedef struct {
 
     DM da;
     Vec RHS;
-    Vec Phi;
+    Vec AAR;
+    Vec PGR;
+    Vec PL2R;
     Vec GMRES;
     Vec BICG;
 
