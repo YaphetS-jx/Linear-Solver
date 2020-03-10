@@ -40,7 +40,7 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
 
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
-    
+
     // -------------- AAR solver --------------------------
     AAR(system.poissonOpr, system.AAR, system.RHS, system.omega, 
         system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
@@ -56,13 +56,6 @@ int main( int argc, char **argv ) {
     PL2R(system.poissonOpr, system.PL2R, system.RHS, system.omega, 
         system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
-#ifdef DEBUG
-    double A_norm, b_norm, x_norm;
-    MatNorm(system.poissonOpr, NORM_FROBENIUS, &A_norm);
-    VecNorm(system.RHS, NORM_2, &b_norm);
-    VecNorm(system.Phi, NORM_2, &x_norm);
-    PetscPrintf(PETSC_COMM_WORLD,"Norm A: %g, b: %g, x: %g\n",A_norm, b_norm, x_norm);
-#endif
 
     // VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
     t2 = MPI_Wtime();
@@ -128,6 +121,19 @@ int main( int argc, char **argv ) {
     t1 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
+
+#ifdef DEBUG
+    double A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm;
+    MatNorm(system.poissonOpr, NORM_FROBENIUS, &A_norm);
+    VecNorm(system.RHS, NORM_2, &b_norm);
+    VecNorm(system.AAR, NORM_2, &x1_norm);
+    VecNorm(system.PGR, NORM_2, &x2_norm);
+    VecNorm(system.PL2R, NORM_2, &x3_norm);
+    VecNorm(system.GMRES, NORM_2, &x4_norm);
+    VecNorm(system.BICG, NORM_2, &x5_norm);
+    PetscPrintf(PETSC_COMM_WORLD,"Norm A: %g, b: %g, x1: %g, x2: %g, x3: %g, x4: %g, x5: %g\n",A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm);
+#endif
+    
     KSPDestroy(&ksp);
     Objects_Destroy(&system); 
     ierr = PetscFinalize();
