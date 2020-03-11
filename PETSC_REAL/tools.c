@@ -13,7 +13,7 @@
 
 void GetLocalVector(DM da, Vec res, Vec *localv, PetscInt *blockinfo, PetscInt Np, PetscScalar *local, PetscScalar ****r)
 {
-    int i, j, k, t;
+    int i, j, k, t, *ix;
     PetscInt xcor = blockinfo[0], ycor = blockinfo[1], zcor = blockinfo[2], 
               lxdim = blockinfo[3], lydim = blockinfo[4], lzdim = blockinfo[5];
     /////////////////////////////////////////////////
@@ -26,8 +26,14 @@ void GetLocalVector(DM da, Vec res, Vec *localv, PetscInt *blockinfo, PetscInt N
         for (j = ycor; j < lydim+ycor; j++)
             for (i = xcor; i < lxdim+xcor; i++)
                 local[t++] = (*r)[k][j][i];
-
-    VecCreateSeqWithArray(MPI_COMM_SELF, 1, Np, local, localv); // Create local vector with extracted value
+            
+    ix = (int *) calloc (Np, sizeof(int));
+    for (i = 0; i < Np; i++)
+        ix[i] = i;
+    VecSetValues(*localv, Np, ix, local, INSERT_VALUES);
+    VecAssemblyBegin(*localv);
+    VecAssemblyEnd(*localv);
+    free(ix);
 }
 
 void RestoreGlobalVector(DM da, Vec global_v, Vec local_v, PetscInt *blockinfo, PetscScalar *local, PetscScalar ****r)

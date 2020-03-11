@@ -54,6 +54,8 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDuplicate(x, &Ax_prev);  
     VecDuplicateVecs(x, m, &DX);                 // storage for delta x
     VecDuplicateVecs(x, m, &DF);                 // storage for delta residual 
+    VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
+    VecDuplicate(res_local, &pres_local);
  
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
@@ -71,7 +73,6 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
-        VecDuplicate(res_local, &pres_local);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
 
@@ -131,10 +132,10 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     }
 
     t1=MPI_Wtime();
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by PL2R = %.4f seconds.\n",t1-t0);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by PL2R = %.6f seconds.\n",t1-t0);
 
 #ifdef DEBUG        
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.4f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.6f seconds.\n",ta);
 #endif 
 
     // deallocate memory

@@ -92,7 +92,7 @@ int main( int argc, char **argv ) {
 
     
     PetscPrintf(PETSC_COMM_WORLD,"GMRES converged to a relative residual of %g in %d iterations.\n",rnorm/bnorm, iteration);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by GMRES = %.4f seconds.\n",(t3-t2));
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by GMRES = %.6f seconds.\n",(t3-t2));
 
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
 
@@ -116,7 +116,7 @@ int main( int argc, char **argv ) {
     VecNorm(res, NORM_2, &rnorm);
     
     PetscPrintf(PETSC_COMM_WORLD,"BICG converged to a relative residual of %g in %d iterations.\n",rnorm/bnorm, iteration);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by BICG = %.4f seconds.\n",(t3-t2));
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by BICG = %.6f seconds.\n",(t3-t2));
     
     t1 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
@@ -134,6 +134,7 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"Norm A: %g, b: %g, x1: %g, x2: %g, x3: %g, x4: %g, x5: %g\n",A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm);
 #endif
     
+    VecDestroy(&res);
     KSPDestroy(&ksp);
     Objects_Destroy(&system); 
     ierr = PetscFinalize();

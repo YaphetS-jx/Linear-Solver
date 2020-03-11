@@ -53,6 +53,8 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDuplicate(x, &DXDF);
     VecDuplicateVecs(x, m, &DX);                // storage for delta x
     VecDuplicateVecs(x, m, &DF);                // storage for delta residual 
+    VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
+    VecDuplicate(res_local, &pres_local);
  
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
@@ -76,9 +78,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
-        // precondition(prec, res, da, blockinfo, local);
-
-        VecDuplicate(res_local, &pres_local);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
         
@@ -140,10 +139,10 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     }
 
     t1=MPI_Wtime();
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by AAR = %.4f seconds.\n",t1-t0);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by AAR = %.6f seconds.\n",t1-t0);
 #ifdef DEBUG
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Anderson update = %.4f seconds.\n",ta);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.4f seconds.\n",tax);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Anderson update = %.6f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
 #endif
 
     // deallocate memory
