@@ -138,10 +138,13 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 #endif 
 
     // deallocate memory
+    VecDestroy(&x_old);
     VecDestroy(&res);
     VecDestroy(&f_old);
     VecDestroy(&res_local);
     VecDestroy(&pres_local);
+    VecDestroy(&Ax);
+    VecDestroy(&Ax_prev);
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);

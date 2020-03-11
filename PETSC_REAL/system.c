@@ -183,6 +183,10 @@ void Objects_Destroy(petsc_real* system) {
     DMDestroy(&system->da); 
     VecDestroy(&system->RHS); 
     VecDestroy(&system->AAR); 
+    VecDestroy(&system->PGR); 
+    VecDestroy(&system->PL2R); 
+    VecDestroy(&system->GMRES); 
+    VecDestroy(&system->BICG); 
     MatDestroy(&system->poissonOpr); 
 
     return; 
