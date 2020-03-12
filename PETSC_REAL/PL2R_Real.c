@@ -57,24 +57,46 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
     VecDuplicate(res_local, &pres_local);
  
+#ifdef DEBUG
+    t1=MPI_Wtime();
+    double tpre = t1 - t0;
+#endif
+
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
 
+#ifdef DEBUG
+    double t2, t3, ta = 0, tax = 0, tp = 0;
+    t2 = MPI_Wtime();
+#endif
+
     // res = b- A * x
     MatMult(A, x, Ax); 
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3-t2);
+#endif
+
     VecWAXPY(res, -1.0, Ax, b);
     VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
     PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
-    double t2, t3, ta=0;
 #endif
     
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
+#ifdef DEBUG
+    t2 = MPI_Wtime();
+#endif
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tp += (t3-t2);
+#endif
 
         VecCopy(x, x_old);
         VecCopy(res, f_old); 
@@ -88,7 +110,16 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
         VecAXPY(x, omega, res);                    // x = x + omega * res
         VecWAXPY(DX[k], -1.0, x_old, x);           // DX[k] = x - x_old        
         
+#ifdef DEBUG            
+    t2 = MPI_Wtime();
+#endif
         MatMult(A, x, Ax); 
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3 - t2);
+#endif
+
         VecWAXPY(res, -1.0, Ax, b);
         VecWAXPY(DF[k], -1.0, Ax_prev, Ax);        // DF[k] = Ax - Ax_prev
 
@@ -117,8 +148,11 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 #endif
 
         VecWAXPY(res, -1.0, Ax, b);
-        VecNorm(res, NORM_2, &r_2norm); 
 
+        if (iter % p == 0) {
+            VecNorm(res, NORM_2, &r_2norm);             
+        }
+        
 #ifdef DEBUG        
         PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
 #endif        
@@ -136,6 +170,9 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
 #ifdef DEBUG        
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.6f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by precondition = %.6f seconds.\n",tp);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by preparation = %.6f seconds.\n", tpre);
 #endif 
 
     // deallocate memory

@@ -56,31 +56,50 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
     VecDuplicate(res_local, &pres_local);
  
+#ifdef DEBUG
+    t1 = MPI_Wtime();
+    double t2, t3, ta = 0, tax = 0, tp = 0, tpre = t1 - t0, tn = 0;;
+    t2 = MPI_Wtime();
+#endif
+
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
 
 #ifdef DEBUG
-    double t2, t3, ta = 0, tax = 0;
+    t3 = MPI_Wtime();
+    tn += (t3-t2);   
     t2 = MPI_Wtime();
 #endif
 
     // res = b- A * x
     MatMult(A,x,res); 
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3-t2);   
+#endif
+
     VecAYPX(res, -1.0, b);
     VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
-    t3 = MPI_Wtime();
-    tax += (t3-t2);
     PetscPrintf(PETSC_COMM_WORLD,"relres: %lf\n", r_2norm/b_2norm);
 #endif
 
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
+
+#ifdef DEBUG
+    t2 = MPI_Wtime();
+#endif
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
         
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tp += (t3-t2);
+#endif
         if (iter > 1){
             k = (iter-2) % m;
             VecWAXPY(DX[k], -1.0, x_old, x);    // DX[k] = x   - x_old
@@ -121,12 +140,23 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     t2 = MPI_Wtime();
 #endif
         MatMult(A,x,res);                       // res = b- A * x
-        VecAYPX(res, -1.0,b);
-        VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
     t3 = MPI_Wtime();
     tax += (t3 - t2);  
+#endif 
+        VecAYPX(res, -1.0,b);
+
+#ifdef DEBUG            
+    t2 = MPI_Wtime();
+#endif
+    if (iter % p == 0) {
+        VecNorm(res, NORM_2, &r_2norm); 
+    }
+
+#ifdef DEBUG  
+    t3 = MPI_Wtime();
+    tn += (t3 - t2);  
     PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
 #endif        
         iter ++;
@@ -143,6 +173,9 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 #ifdef DEBUG
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by Anderson update = %.6f seconds.\n",ta);
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by precondition = %.6f seconds.\n",tp);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by preparation = %.6f seconds.\n", tpre);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by norm = %.6f seconds.\n", tn);
 #endif
 
     // deallocate memory
