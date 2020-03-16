@@ -9,6 +9,7 @@
  */
 
 #include "PL2R_Real.h"
+#include "tools.h"
 
 void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
@@ -17,16 +18,17 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, f_old, *DX, *DF, Ax, Ax_prev;
+    Vec x_old, res, res_local, pres_local, f_old, *DX, *DF, Ax, Ax_prev;
     PC prec;
     Mat Dblock;
-    PetscInt blockinfo[6];
-    PetscScalar *local;
+    PetscInt blockinfo[6], Np;
+    PetscScalar *local, *DFres, ***r;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
-    local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
-    PetscScalar * DFres = calloc(m , sizeof(PetscScalar));      // DFres = DF' * res
+    Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
+    local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
+    DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));      // DFres = DF' * res
     assert(local != NULL && DFres != NULL);
     MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
 
@@ -40,7 +42,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     else if (pc==0) {
         PCSetType(prec, PCJACOBI); 
         // AAJ
-        PetscPrintf(PETSC_COMM_WORLD, "PL2R preconditioned with Jacobi (AAJ).\n");
+        PetscPrintf(PETSC_COMM_WORLD, "PL2R preconditioned with Jacobi.\n");
     }
     PCSetOperators(prec, Dblock, Dblock);
 
@@ -52,23 +54,49 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDuplicate(x, &Ax_prev);  
     VecDuplicateVecs(x, m, &DX);                 // storage for delta x
     VecDuplicateVecs(x, m, &DF);                 // storage for delta residual 
+    VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
+    VecDuplicate(res_local, &pres_local);
  
+#ifdef DEBUG
+    t1=MPI_Wtime();
+    double tpre = t1 - t0;
+#endif
+
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
 
+#ifdef DEBUG
+    double t2, t3, ta = 0, tax = 0, tp = 0;
+    t2 = MPI_Wtime();
+#endif
+
     // res = b- A * x
     MatMult(A, x, Ax); 
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3-t2);
+#endif
+
     VecWAXPY(res, -1.0, Ax, b);
     VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
     PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
-    double t2, t3, ta=0;
 #endif
     
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
-        precondition(prec, res, da, blockinfo, local);
+#ifdef DEBUG
+    t2 = MPI_Wtime();
+#endif
+        GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
+        PCApply(prec, res_local, pres_local);
+        RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tp += (t3-t2);
+#endif
 
         VecCopy(x, x_old);
         VecCopy(res, f_old); 
@@ -82,7 +110,16 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
         VecAXPY(x, omega, res);                    // x = x + omega * res
         VecWAXPY(DX[k], -1.0, x_old, x);           // DX[k] = x - x_old        
         
+#ifdef DEBUG            
+    t2 = MPI_Wtime();
+#endif
         MatMult(A, x, Ax); 
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3 - t2);
+#endif
+
         VecWAXPY(res, -1.0, Ax, b);
         VecWAXPY(DF[k], -1.0, Ax_prev, Ax);        // DF[k] = Ax - Ax_prev
 
@@ -111,8 +148,11 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 #endif
 
         VecWAXPY(res, -1.0, Ax, b);
-        VecNorm(res, NORM_2, &r_2norm); 
 
+        if (iter % p == 0) {
+            VecNorm(res, NORM_2, &r_2norm);             
+        }
+        
 #ifdef DEBUG        
         PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
 #endif        
@@ -126,19 +166,28 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     }
 
     t1=MPI_Wtime();
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by PL2R = %.4f seconds.\n",t1-t0);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by PL2R = %.6f seconds.\n",t1-t0);
 
 #ifdef DEBUG        
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.4f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.6f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by precondition = %.6f seconds.\n",tp);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by preparation = %.6f seconds.\n", tpre);
 #endif 
 
     // deallocate memory
+    VecDestroy(&x_old);
     VecDestroy(&res);
     VecDestroy(&f_old);
+    VecDestroy(&res_local);
+    VecDestroy(&pres_local);
+    VecDestroy(&Ax);
+    VecDestroy(&Ax_prev);
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);
     free(DFres);
+    PCDestroy(&prec);
 }
 
 /**
@@ -156,13 +205,20 @@ void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m)
     /////////////////////////////////////////////////
 
     for (i=0; i<m; i++)
+        for(j=0; j<i+1; j++)
+            VecTDotBegin(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+        
+    for (i=0; i<m; i++)
+        VecTDotBegin(DF[i], res, &DFres[i]);                         // DFres(i)   = DF[i]' * res
+
+    for (i=0; i<m; i++)
         for(j=0; j<i+1; j++){
-            VecTDot(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+            VecTDotEnd(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
             DFtDF[i+m*j] = DFtDF[m*i+j];                        // DFtDF(j,i) = DFtDF(i,j) symmetric 
         }
         
     for (i=0; i<m; i++)
-        VecTDot(DF[i], res, &DFres[i]);                         // DFres(i)   = DF[i]' * res
+        VecTDotEnd(DF[i], res, &DFres[i]);                         // DFres(i)
 
     // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DFtDF, m, DFres, m, svec, -1.0, &lprank);

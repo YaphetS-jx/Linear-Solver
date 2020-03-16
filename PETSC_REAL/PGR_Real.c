@@ -9,6 +9,7 @@
  */
 
 #include "PGR_Real.h"
+#include "tools.h"
 
 void PGR(Mat A, Vec x, Vec b, PetscScalar omega, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
@@ -17,16 +18,17 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, f_old, *DX, *DF, Ax, Ax_prev;
+    Vec x_old, res, res_local, pres_local, f_old, *DX, *DF, Ax, Ax_prev;
     PC prec;
     Mat Dblock;
-    PetscInt blockinfo[6];
-    PetscScalar *local, * DXres;
+    PetscInt blockinfo[6], Np;
+    PetscScalar *local, * DXres, ***r;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
-    local = (PetscScalar *) calloc (blockinfo[3] * blockinfo[4] * blockinfo[5], sizeof(PetscScalar));
-    DXres = calloc(m, sizeof(PetscScalar));       // DFres = DF' * res
+    Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
+    local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
+    DXres = (PetscScalar *) calloc (m , sizeof(PetscScalar));       // DFres = DF' * res
     assert(local != NULL && DXres != NULL);
     MatGetDiagonalBlock(A,&Dblock);               // diagonal block of matrix A
 
@@ -40,7 +42,7 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     else if (pc==0) {
         PCSetType(prec, PCJACOBI); 
         // AAJ
-        PetscPrintf(PETSC_COMM_WORLD, "PGR preconditioned with Jacobi (AAJ).\n");
+        PetscPrintf(PETSC_COMM_WORLD, "PGR preconditioned with Jacobi.\n");
     }
     PCSetOperators(prec, Dblock, Dblock);
 
@@ -52,23 +54,50 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     VecDuplicate(x, &Ax_prev); 
     VecDuplicateVecs(x, m, &DX);                  // storage for delta x
     VecDuplicateVecs(x, m, &DF);                  // storage for delta residual 
+    VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
+    VecDuplicate(res_local, &pres_local);
  
+#ifdef DEBUG
+    t1=MPI_Wtime();
+    double tpre = t1 - t0;
+#endif
+
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
 
+#ifdef DEBUG
+    double t2, t3, ta = 0, tax = 0, tp = 0;
+    t2 = MPI_Wtime();
+#endif
+
     // res = b- A * x
     MatMult(A, x, Ax); 
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3-t2);
+#endif
+
     VecWAXPY(res, -1.0, Ax, b);
     VecNorm(res, NORM_2, &r_2norm); 
 
 #ifdef DEBUG
     PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
-    double t2, t3, ta=0;
 #endif
     
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
-        precondition(prec, res, da, blockinfo, local);
+#ifdef DEBUG
+    t2 = MPI_Wtime();
+#endif
+        GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
+        PCApply(prec, res_local, pres_local);
+        RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tp += (t3-t2);
+#endif
 
         VecCopy(x, x_old);
         VecCopy(res, f_old); 
@@ -82,7 +111,15 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
         VecAXPY(x, omega, res);                    // x = x + omega * res
         VecWAXPY(DX[k], -1.0, x_old, x);           // DX[k] = x - x_old        
 
+#ifdef DEBUG            
+    t2 = MPI_Wtime();
+#endif
         MatMult(A, x, Ax); 
+
+#ifdef DEBUG
+    t3 = MPI_Wtime();
+    tax += (t3 - t2);
+#endif
         VecWAXPY(res, -1.0, Ax, b);
         VecWAXPY(DF[k], -1.0, Ax_prev, Ax);        // DF[k] = Ax - Ax_prev
 
@@ -111,7 +148,11 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     ta += (t3 - t2);
 #endif
         VecWAXPY(res, -1.0, Ax, b);
-        VecNorm(res, NORM_2, &r_2norm); 
+
+        if (iter % p == 0) {
+            VecNorm(res, NORM_2, &r_2norm); 
+        }
+
 
 #ifdef DEBUG        
         PetscPrintf(PETSC_COMM_WORLD,"relres: %g\n", r_2norm/b_2norm);
@@ -126,19 +167,28 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     }
 
     t1=MPI_Wtime();
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by PGR = %.4f seconds.\n",t1-t0);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by PGR = %.6f seconds.\n",t1-t0);
 
 #ifdef DEBUG        
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.4f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Galerkin-Richardson update = %.6f seconds.\n", ta);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n", tax);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by precondition = %.6f seconds.\n", tp);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by preparation = %.6f seconds.\n", tpre);
 #endif 
 
     // deallocate memory
+    VecDestroy(&x_old);
     VecDestroy(&res);
     VecDestroy(&f_old);
+    VecDestroy(&res_local);
+    VecDestroy(&pres_local);
+    VecDestroy(&Ax);
+    VecDestroy(&Ax_prev);
     VecDestroyVecs(m, &DX);
     VecDestroyVecs(m, &DF);
     free(local);
     free(DXres);
+    PCDestroy(&prec);
 }
 
 /**
@@ -157,10 +207,17 @@ void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscIn
 
     for (i=0; i<m; i++)
         for(j=0; j<m; j++)
-            VecTDot(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+            VecTDotBegin(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
     
     for (i=0; i<m; i++)
-        VecTDot(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
+        VecTDotBegin(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
+
+    for (i=0; i<m; i++)
+        for(j=0; j<m; j++)
+            VecTDotEnd(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+    
+    for (i=0; i<m; i++)
+        VecTDotEnd(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
 
     // Least square problem solver. DXres = pinv(DX'*DF)*(DX'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DXtDF, m, DXres, m, svec, -1.0, &lprank);

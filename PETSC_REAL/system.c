@@ -16,26 +16,20 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscInt p, i; 
     PetscReal Nr, Dr, val; 
 
-    system->order = 3; 
+    system->order = 6; 
     // store half order
-    system->numPoints_x = 48; system->numPoints_y = 48; system->numPoints_z = 48; 
+    system->numPoints_x = 100; system->numPoints_y = 100; system->numPoints_z = 100; 
 
-    if (argc < 8) {
+    if (argc < 7) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n"); 
         exit(-1); 
     } else {
-        system->solver = atoi(argv[1]); 
-        system->pc = atoi(argv[2]); 
-        system->solver_tol = atof(argv[3]); 
-        system->m = atoi(argv[4]); 
-        system->p = atoi(argv[5]); 
-        system->omega = atof(argv[6]); 
-        system->beta = atof(argv[7]); 
-    }
-
-    if (system->solver >2 || system->solver <0){
-        PetscPrintf(PETSC_COMM_WORLD, "Nonexistent solver\n"); 
-        exit(-1); 
+        system->pc = atoi(argv[1]); 
+        system->solver_tol = atof(argv[2]); 
+        system->m = atoi(argv[3]); 
+        system->p = atoi(argv[4]); 
+        system->omega = atof(argv[5]); 
+        system->beta = atof(argv[6]); 
     }
 
     if (system->pc >1 || system->pc <0){
@@ -71,12 +65,11 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscPrintf(PETSC_COMM_WORLD, "***************************************************************************\n"); 
 
     //PetscPrintf(PETSC_COMM_WORLD, "FD_ORDER    : %d\n", 2*system->order); 
-    if (system->solver == 0)
-        PetscPrintf(PETSC_COMM_WORLD, "Solver      : AAR\n"); 
-    else if (system->solver == 1)
-        PetscPrintf(PETSC_COMM_WORLD, "Solver      : PGR\n"); 
-    else
-        PetscPrintf(PETSC_COMM_WORLD, "Solver      : PL2R\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : AAR\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : PGR\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : PL2R\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : GMRES\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : BICG\n"); 
     if (system->pc == 1)
         PetscPrintf(PETSC_COMM_WORLD, "system_pc   : Block-Jacobi using ICC(0)\n"); 
     else
@@ -99,13 +92,8 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
 /*****************************************************************************/
 
 void Setup_and_Initialize(petsc_real* system, int argc, char **argv) {
-    ObjectInitialize(system); 
     Read_parameters(system, argc, argv); 
     Objects_Create(system);      
-}
-
-void ObjectInitialize(petsc_real* system) {
-    PetscOptionsGetString(PETSC_NULL, "-name", system->file, sizeof(system->file), PETSC_NULL); 
 }
 
 void Objects_Create(petsc_real* system) {
@@ -115,55 +103,69 @@ void Objects_Create(petsc_real* system) {
     PetscInt o = system->order; 
     double RHSsum; 
 
-    PetscInt gxdim, gydim, gzdim, xcor, ycor, zcor, lxdim, lydim, lzdim, nprocx, nprocy, nprocz; 
-    int i; 
+    PetscInt gxdim, gydim, gzdim, xcor, ycor, zcor, lxdim, lydim, lzdim, nprocx, nprocy, nprocz, gidx; 
     Mat A; 
     PetscMPIInt comm_size; 
+    PetscReal ***r, val;
     MPI_Comm_size(PETSC_COMM_WORLD, &comm_size); 
 
-    DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
+    PetscErrorCode ieer = DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
     PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, 1, o, 0, 0, 0, &system->da);        // create a pattern and communication layout
+    DMSetUp(system->da);
+    DMDAGetCorners(system->da, &xcor, &ycor, &zcor, &lxdim, &lydim, &lzdim); 
 
     DMCreateGlobalVector(system->da, &system->RHS);                          // using the layour of da to create vectors RHS
-    VecDuplicate(system->RHS, &system->Phi);                                 // create Phi by duplicating the pattern of RHS
+    VecDuplicate(system->RHS, &system->AAR); 
+    VecDuplicate(system->RHS, &system->PGR); 
+    VecDuplicate(system->RHS, &system->PL2R);                                
+    VecDuplicate(system->RHS, &system->GMRES);                               
+    VecDuplicate(system->RHS, &system->BICG);                                // create Initial by duplicating the pattern of RHS
 
     PetscRandom rnd; 
     unsigned long seed; 
-    int rank; 
+    int rank, i, j, k, t = 0; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
 
     // RHS vector
     PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
     PetscRandomSetFromOptions(rnd); 
-    seed=rank; 
     
-    PetscRandomSetSeed(rnd, seed); 
-    PetscRandomSeed(rnd); 
-
-    VecSetRandom(system->RHS, rnd); 
+    // generating RHS independent of number of processors
+    VecAssemblyBegin(system->RHS);
+    DMDAVecGetArray(system->da, system->RHS, &r); 
+    for (k = zcor; k < lzdim+zcor; k++)
+        for (j = ycor; j < lydim+ycor; j++)
+            for (i = xcor; i < lxdim+xcor; i++){
+                gidx = (k)*n_x*n_y + (j)*n_x + (i);
+                PetscRandomSetSeed(rnd, gidx + 1);
+                PetscRandomSeed(rnd);
+                PetscRandomGetValueReal(rnd, &val);
+                r[k][j][i] = val;
+            }
+    DMDAVecRestoreArray(system->da, system->RHS, &r);
+    VecAssemblyEnd(system->RHS);
+    PetscRandomDestroy(&rnd); 
 
     VecSum(system->RHS, &RHSsum); 
     RHSsum = -RHSsum/(n_x*n_y*n_z); 
     VecShift(system->RHS, RHSsum); 
 
-    PetscRandomDestroy(&rnd); 
-
-    // VecView(system->RHS, PETSC_VIEWER_STDOUT_WORLD); 
-
     // Initial random guess
     PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
     PetscRandomSetFromOptions(rnd); 
-    seed=1;  
+    seed=rank;  
     PetscRandomSetSeed(rnd, seed); 
     PetscRandomSeed(rnd); 
 
-    VecSetRandom(system->Phi, rnd); 
+    // VecSetRandom(system->AAR, rnd); 
+    VecSet(system->AAR, 1.0); 
+    VecCopy(system->AAR, system->PGR);
+    VecCopy(system->AAR, system->PL2R);
+    VecCopy(system->AAR, system->GMRES);
+    VecCopy(system->AAR, system->BICG);
 
     PetscRandomDestroy(&rnd); 
-
-    // Initial all ones guess 
-    // VecSet(system->Phi, 1.0); 
 
     if (comm_size == 1 ) {
         DMCreateMatrix(system->da, &system->poissonOpr); 
@@ -180,7 +182,11 @@ void Objects_Create(petsc_real* system) {
 void Objects_Destroy(petsc_real* system) {
     DMDestroy(&system->da); 
     VecDestroy(&system->RHS); 
-    VecDestroy(&system->Phi); 
+    VecDestroy(&system->AAR); 
+    VecDestroy(&system->PGR); 
+    VecDestroy(&system->PL2R); 
+    VecDestroy(&system->GMRES); 
+    VecDestroy(&system->BICG); 
     MatDestroy(&system->poissonOpr); 
 
     return; 
@@ -254,5 +260,7 @@ void ComputeMatrixA(petsc_real* system) {
     MatAssemblyBegin(system->poissonOpr, MAT_FINAL_ASSEMBLY); 
     MatAssemblyEnd(system->poissonOpr, MAT_FINAL_ASSEMBLY); 
 
-    // MatView(system->poissonOpr, PETSC_VIEWER_STDOUT_WORLD); 
+    PetscFree(col);
+    PetscFree(val);
+
 }

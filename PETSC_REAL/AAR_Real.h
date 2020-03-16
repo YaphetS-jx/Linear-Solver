@@ -12,11 +12,10 @@
 #define AAR_REAL_H
 
 #include "system.h"
+#include "tools.h"
 
 void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
-
-void precondition(PC prec, Vec res, DM da, PetscInt *blockinfo, PetscScalar *local);
 
 void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m);
 
