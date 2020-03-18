@@ -1,4 +1,4 @@
-all: aar
+all: mpi_real
 
 CC = mpicc
 
@@ -11,7 +11,7 @@ OBJSC = main.o system.o AAR.o
 # aar: ${OBJSC} 
 # 	${CC} -o ./aar $^ ${CFLAGS} ${LIBS}
 
-aar: $(OBJSC)
+mpi_real: $(OBJSC)
 	${CC} ${CFLAGS} ${LIBS} -o $@ $^ 
 
 

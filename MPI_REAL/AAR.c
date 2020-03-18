@@ -4,265 +4,290 @@
 ///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// AAR solver /////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-void AAR(DS_AAR* pAAR) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+void AAR(DS_AAR* pAAR,
+        void (*PoissonResidual)(DS_AAR*, double*, double*, int, int, MPI_Comm),
+        double *x, double *rhs, double omega, double beta, int m, int p, 
+        int max_iter, double tol, int FDn, int np_x, int np_y, int np_z, MPI_Comm comm_dist_graph_cart) {
+    int rank; 
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
-    double omega_aar=pAAR->omega_aar; 
-    double beta_aar=pAAR->beta_aar;  
-    int m_aar=pAAR->m_aar; 
-    int p_aar = pAAR->p_aar; 
-    int i,j,k,m;
-    double ***phi_new,***phi_old,***phi_res,***phi_temp,*phi_res_vec,*phi_old_vec,*Xold,*Fold,**DX,**DF,*am_vec,t_poiss0,t_poiss1; 
-    MPI_Comm comm_dist_graph_cart = pAAR->comm_laplacian; // communicator with cartesian distributed graph topology
+    int i, j, k, col; 
+    double *res, *x_old, *f_old, **DX, **DF, *am_vec, t_poiss0, t_poiss1;  
 
+    // allocate memory to store x(x) in domain
+    // x_new = (double***)calloc((np_z+2*FDn), sizeof(double**)); 
+    // x_old = (double***)calloc((np_z+2*FDn), sizeof(double**)); 
+    // x_res = (double***)calloc((np_z+2*FDn), sizeof(double**)); 
+    // x_temp = (double***)calloc((np_z+2*FDn), sizeof(double**));   
+    // assert(x_new !=  NULL && x_old !=  NULL && x_res !=  NULL && x_temp !=  NULL); 
 
-    // allocate memory to store phi(x) in domain
-    phi_new = (double***)calloc((pAAR->np_z+2*pAAR->FDn) , sizeof(double**));
-    phi_old = (double***)calloc((pAAR->np_z+2*pAAR->FDn) , sizeof(double**));
-    phi_res = (double***)calloc((pAAR->np_z+2*pAAR->FDn) , sizeof(double**));
-    phi_temp = (double***)calloc((pAAR->np_z+2*pAAR->FDn) , sizeof(double**));  
-    assert(phi_new != NULL && phi_old != NULL && phi_res != NULL && phi_temp != NULL);
+    // for (k = 0; k<np_z+2*FDn; k++) {
+    //     x_new[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
+    //     x_old[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
+    //     x_res[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
+    //     x_temp[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
+    //     assert(x_new[k] !=  NULL && x_old[k] !=  NULL && x_res[k] !=  NULL && x_temp[k] !=  NULL); 
 
-    for (k=0;k<pAAR->np_z+2*pAAR->FDn;k++) {
-        phi_new[k] = (double**)calloc((pAAR->np_y+2*pAAR->FDn) , sizeof(double*));
-        phi_old[k] = (double**)calloc((pAAR->np_y+2*pAAR->FDn) , sizeof(double*));
-        phi_res[k] = (double**)calloc((pAAR->np_y+2*pAAR->FDn) , sizeof(double*));
-        phi_temp[k] = (double**)calloc((pAAR->np_y+2*pAAR->FDn) , sizeof(double*));
-        assert(phi_new[k] != NULL && phi_old[k] != NULL && phi_res[k] != NULL && phi_temp[k] != NULL);
+    //     for (j = 0; j<np_y+2*FDn; j++) {
+    //         x_new[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
+    //         x_old[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
+    //         x_res[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
+    //         x_temp[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
+    //         assert(x_new[k][j] !=  NULL && x_old[k][j] !=  NULL && x_res[k][j] !=  NULL && x_temp[k][j] !=  NULL); 
+    //     }
+    // }
 
-        for (j=0;j<pAAR->np_y+2*pAAR->FDn;j++) {
-            phi_new[k][j] = (double*)calloc((pAAR->np_x+2*pAAR->FDn) , sizeof(double));
-            phi_old[k][j] = (double*)calloc((pAAR->np_x+2*pAAR->FDn) , sizeof(double));
-            phi_res[k][j] = (double*)calloc((pAAR->np_x+2*pAAR->FDn) , sizeof(double));
-            phi_temp[k][j] = (double*)calloc((pAAR->np_x+2*pAAR->FDn) , sizeof(double));
-            assert(phi_new[k][j] != NULL && phi_old[k][j] != NULL && phi_res[k][j] != NULL && phi_temp[k][j] != NULL);
-        }
-    }
-
-    // allocate memory to store phi(x) in domain
-    phi_res_vec = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double)); 
-    phi_old_vec = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double));
-    Xold = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double)); 
-    Fold = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double)); 
-    am_vec = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double)); 
-    assert(phi_res_vec != NULL && phi_old_vec !=NULL && Xold !=NULL && Fold !=NULL && am_vec !=NULL);
+    // allocate memory to store x(x) in domain
+    int Np = np_z * np_y * np_x;
+    res = (double*)calloc(Np, sizeof(double));  
+    // x_old = (double*)calloc(Np, sizeof(double)); 
+    x_old = (double*)calloc(Np, sizeof(double));  
+    f_old = (double*)calloc(Np, sizeof(double));  
+    am_vec = (double*)calloc(Np, sizeof(double));  
+    assert(res !=  NULL &&  x_old != NULL && f_old != NULL && am_vec != NULL); 
 
     // allocate memory to store DX, DF history matrices
-    DX = (double**) calloc(m_aar , sizeof(double*));
-    DF = (double**) calloc(m_aar , sizeof(double*));
-    assert(DF != NULL && DX !=NULL);
+    DX = (double**) calloc(m, sizeof(double*)); 
+    DF = (double**) calloc(m, sizeof(double*)); 
+    assert(DF !=  NULL && DX != NULL); 
 
-    for (k=0;k<m_aar;k++) {
-        DX[k] = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double));
-        DF[k] = (double*)calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double));
-        assert(DX[k] != NULL && DF[k] != NULL);
+    for (k = 0; k<m; k++) {
+        DX[k] = (double*)calloc(Np, sizeof(double)); 
+        DF[k] = (double*)calloc(Np, sizeof(double)); 
+        assert(DX[k] !=  NULL && DF[k] !=  NULL); 
     }
 
-    // Initialize phi_old from phi_guess
-    int ctr=0;
-    for (k=0;k<pAAR->np_z;k++) {
-        for (j=0;j<pAAR->np_z;j++) {
-            for (i=0;i<pAAR->np_z;i++) {
-                phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = pAAR->phi_guess[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]; 
-                phi_temp[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn];
-                ctr+=1;
-            }
-        }
-    }
+    double *FtF, *allredvec, *Ftf, *svec;                           
+    FtF = (double*) calloc(m*m, sizeof(double));                       // DF'*DF matrix in column major format
+    allredvec = (double*) calloc(m*m+m, sizeof(double));               
+    Ftf = (double*) calloc(m, sizeof(double));                             // DF'*res vector of size m x 1
+    svec = (double*) calloc(m, sizeof(double));                            // vector to store singular values    
+    int iter = 1; 
+    double relres = tol+1; 
+
+    // Initialize x_old from initial_guess
+    // AXPYMvPs_3d(x_old, x, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn); 
+    // AXPYMvPs_3d(x_temp, x_old, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn); 
 
     // calculate norm of right hand side (required for relative residual)
-    double rhs_norm=1.0,*rhs_vec;
-    rhs_vec = (double*) calloc(pAAR->np_z*pAAR->np_y*pAAR->np_x , sizeof(double)); 
-    assert(rhs_vec != NULL);
+    double rhs_norm = 1.0;
+    Vector2Norm(rhs, Np, &rhs_norm); 
+    tol *= rhs_norm;
 
-    ctr=0;
-    for (k=0;k<pAAR->np_z;k++) {
-        for (j=0;j<pAAR->np_y;j++) {
-            for (i=0;i<pAAR->np_x;i++) {
-                rhs_vec[ctr]=pAAR->rhs[k][j][i]; 
-                ctr=ctr+1;
-            }
-        }
-    }
-    Vector2Norm(rhs_vec,pAAR->np_x*pAAR->np_y*pAAR->np_z,&rhs_norm);
-    free(rhs_vec);
+    PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
 
-    int Np=pAAR->np_z*pAAR->np_y*pAAR->np_x;
+    Vector2Norm(res, Np, &relres);
+    if(!rank) printf("reslres: %g\n", relres);
 
-    double *FtF,*allredvec; // DF'*DF matrix in column major format
-    FtF = (double*) calloc(m_aar*m_aar , sizeof(double));
-    allredvec = (double*) calloc(m_aar*m_aar+m_aar+1 , sizeof(double));
-    double *Ftf; // DF'*phi_res_vec vector of size m x 1
-    Ftf = (double*) calloc(m_aar , sizeof(double));
-    double *svec; // vector to store singular values    
-    svec = (double*) calloc(m_aar , sizeof(double)); 
+    Vector2Norm(x, Np, &relres);
+    if(!rank && iter < 15) printf("phi: %g\n", relres);
 
-    int max_iter=pAAR->solver_maxiter; 
-    int iter=1;
-    double tol = pAAR->solver_tol;
-    double res = tol+1;
-
-    t_poiss0 = MPI_Wtime();
+    t_poiss0 = MPI_Wtime(); 
     
     // begin while loop
-    while (res>tol && iter <= max_iter) {
-        PoissonResidual(pAAR,phi_temp,phi_res,iter,comm_dist_graph_cart,pAAR->LapInd.eout_s,pAAR->LapInd.eout_e, pAAR->LapInd.ein_s,pAAR->LapInd.ein_e, pAAR->LapInd.ereg_s,pAAR->LapInd.ereg_e,pAAR->LapInd.stencil_sign,pAAR->LapInd.edge_ind, pAAR->LapInd.displs_send,pAAR->LapInd.displs_recv,pAAR->LapInd.ncounts_send,pAAR->LapInd.ncounts_recv);
+    while (relres > tol && iter <=  max_iter) {
+        // PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
 
-        // -------------- Update phi --------------- //
-        ctr=0;
-        for (k=0;k<pAAR->np_z;k++) {
-            for (j=0;j<pAAR->np_y;j++) {
-                for (i=0;i<pAAR->np_x;i++) {             
-                    phi_res_vec[ctr]=phi_res[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn];
-                    phi_old_vec[ctr]=phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn];
-                    ctr=ctr+1;
-                }
-            }
-        }
+        // -------------- Update x --------------- //
+        // convert_to_vector(x_res, res, np_x, np_y, np_z, FDn);
+        // convert_to_vector(x_old, x_old, np_x, np_y, np_z, FDn);
+
         //----------Store Residual & Iterate History----------//
         if(iter>1) {
-            m = ((iter-2) % m_aar)+1-1; //-1 because the index starts from 0
-            ctr=0;
-            for (k=0;k<pAAR->np_z;k++) {
-                for (j=0;j<pAAR->np_y;j++) {
-                    for (i=0;i<pAAR->np_x;i++) {
-                        DX[m][ctr]=phi_old_vec[ctr]-Xold[ctr];
-                        DF[m][ctr]=phi_res_vec[ctr]-Fold[ctr];
-                        ctr=ctr+1;
-                    }
-                }
+            col = ((iter-2) % m); 
+            for (i = 0; i < Np; i++){
+                DX[col][i] = x[i] - x_old[i];
+                DF[col][i] = res[i] - f_old[i];
             }
-        } // end if
-          
-        ctr=0;
-        for (k=0;k<pAAR->np_z;k++) {
-            for (j=0;j<pAAR->np_y;j++) {
-                for (i=0;i<pAAR->np_x;i++) {
-                    Xold[ctr] = phi_old_vec[ctr];
-                    Fold[ctr] = phi_res_vec[ctr];         
-                    ctr=ctr+1;
-                }
-            }
+            // AXPY(DX[col], x_old, Xold, -1.0, np_x, np_y, np_z); // DX = delta x
+            // AXPY(DF[col], res, Fold, -1.0, np_x, np_y, np_z); // DF = delta res
+        } 
+
+        // AXPY(Xold, x_old, NULL, 0, np_x, np_y, np_z);   // Xold = x_old;
+        // AXPY(Fold, res, NULL, 0, np_x, np_y, np_z);   // Fold = x_res;
+
+        for (i = 0; i < Np; i++){
+            x_old[i] = x[i];
+            f_old[i] = res[i];
         }
 
         //----------Anderson update-----------//
-        if(iter % p_aar == 0 && iter>1) {
-            ctr=0;
-            res=0.0;
-            for (k=0;k<pAAR->np_z;k++) {
-                for (j=0;j<pAAR->np_y;j++) {
-                    for (i=0;i<pAAR->np_x;i++) {
-                        res = res + phi_res_vec[ctr]*phi_res_vec[ctr];
-                        ctr=ctr+1;
-                    }
-                }
+        if(iter % p == 0 && iter>1) {
+            // vec_dot_product(&relres, res, res, np_x, np_y, np_z);
+
+            // allredvec[m * m + m] = relres; 
+
+            AndersonExtrapolation(DX, DF, res, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec); 
+
+            for (i = 0; i < Np; i ++){
+                x[i] = x_old[i] + beta * res[i] - am_vec[i];
             }
-            allredvec[m_aar*m_aar+m_aar]=res;
+            // relres = sqrt(allredvec[m * m + m])/rhs_norm;                  // relative residual    
 
-            AndersonExtrapolation(DX,DF,phi_res_vec,beta_aar,m_aar,Np,am_vec,FtF,allredvec,Ftf,svec);
+            PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
 
-            res = sqrt(allredvec[m_aar*m_aar+m_aar])/rhs_norm; // relative residual    
+            Vector2Norm(res, Np, &relres);
+            if(!rank && iter < 15) printf("reslres: %g\n", relres);
 
-            ctr=0;
-            for (k=0;k<pAAR->np_z;k++) {
-                for (j=0;j<pAAR->np_y;j++) {
-                    for (i=0;i<pAAR->np_x;i++) {
-                        // phi_k+1 = phi_k + beta*f_k - dp (Anderson update)
-                        phi_new[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]=phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]+beta_aar*phi_res[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]-am_vec[ctr];
-                        ctr=ctr+1;
-                    }
-                }
-            }
+            // AXPYMvPs_3d(x_new, x_old, x_res, am_vec, beta, 0, np_x, np_y, np_z, FDn);
+
         } else {
-        //----------Richardson update-----------//
-        // phi_k+1 = phi_k + omega*f_k
-            for (k=0;k<pAAR->np_z;k++) {
-                for (j=0;j<pAAR->np_y;j++) {
-                    for (i=0;i<pAAR->np_x;i++) { 
-                        phi_new[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]=phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]+omega_aar*phi_res[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn];
-                    }
-                }
+            //----------Richardson update-----------//
+            // AXPYMvPs_3d(x_new, x_old, x_res, NULL, omega, 0, np_x, np_y, np_z, FDn);    // x_k+1 = x_k + omega*f_k
+
+            for (i = 0; i < Np; i++){
+                x[i] = x_old[i] + omega * res[i];
             }
+
+            PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
+            Vector2Norm(res, Np, &relres);
+            if(!rank && iter < 15) printf("reslres: %g\n", relres);
+
+            Vector2Norm(x, Np, &relres);
+            if(!rank && iter < 15) printf("phi: %g\n", relres);
         }
 
-        // set phi_old = phi_new
-        for (k=0;k<pAAR->np_z;k++) {
-            for (j=0;j<pAAR->np_y;j++) {
-                for (i=0;i<pAAR->np_x;i++) {
-                    if(res<=tol || iter==max_iter) {
-                        pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]=phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]; // store the solution of Poisson's equation
-                    }
-                    phi_old[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]=phi_new[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn];            
-                }
-            }
-        }
+        // if(res<= tol || iter  ==  max_iter) {
+        //     AXPYMvPs_3d(x, x_old, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn);             // store the solution of Poisson's equation
+        // }
 
-        for (k=0;k<pAAR->np_z+2*pAAR->FDn;k++) { // z-direction of interior region
-            for (j=0;j<pAAR->np_y+2*pAAR->FDn;j++) { // y-direction of interior region
-                for (i=0;i<pAAR->np_x+2*pAAR->FDn;i++) { // x-direction of interior region
-                //i,j,k indices are w.r.t proc+FDn domain
-                    phi_temp[k][j][i]=phi_old[k][j][i];
-                }
-            }
-        }
+        // AXPYMvPs_3d(x_old, x_new, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn);                   // set x_old = x_new
 
-        iter=iter+1;
+        // AXPYMvPs_3d(x_temp, x_old, NULL, NULL, 0, 0, np_x+2*FDn, np_y+2*FDn, np_z+2*FDn, 0);  // update x_temp
+
+        iter = iter+1; 
     } // end while loop
 
-    t_poiss1 = MPI_Wtime();
-    if(rank==0) {
-        if(iter<max_iter && res<=tol)
-            {printf("AAR preconditioned with Jacobi (AAJ).\n"); printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n",iter-1,res,t_poiss1-t_poiss0);}
-        if(iter>=max_iter)
-            {printf("WARNING: AAR exceeded maximum iterations.\n");printf("AAR:  Iterations = %d, Residual = %g, Time = %.4f sec \n",iter-1,res,t_poiss1-t_poiss0);}
-    }
-
-    // shift phi since it can differ by a constant
-    double phi_fix=0.0;
-    double phi000=pAAR->phi[pAAR->FDn][pAAR->FDn][pAAR->FDn];
-    MPI_Bcast(&phi000,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-    for (k=0;k<pAAR->np_z;k++) {
-        for (j=0;j<pAAR->np_y;j++) {
-            for (i=0;i<pAAR->np_x;i++) {
-                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn]+phi_fix-phi000;
-            }
+    t_poiss1 = MPI_Wtime(); 
+    if(rank  ==  0) {
+        if(iter<max_iter && relres<= tol) {
+            printf("AAR preconditioned with Jacobi (AAJ).\n");  
+            printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relres, t_poiss1-t_poiss0); 
+        }
+        if(iter>= max_iter) {
+            printf("WARNING: AAR exceeded maximum iterations.\n"); 
+            printf("AAR:  Iterations = %d, Residual = %g, Time = %.4f sec \n", iter-1, relres, t_poiss1-t_poiss0); 
         }
     }
-  
+
+    // shift x since it can differ by a constant
+    double x_fix = 0.0; 
+    double x000 = x[FDn + FDn*np_y + FDn*np_y*np_z]; 
+    MPI_Bcast(&x000, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
+    // AXPYMvPs_3d(x, x, NULL, NULL, 0, x_fix - x000, np_x, np_y, np_z, FDn);
+    for (i = 0; i < Np; i++){
+        x[i] = x[i] + x_fix - x000;
+    }
+
     // de-allocate memory
-    for (k=0;k<pAAR->np_z+2*pAAR->FDn;k++) {
-        for (j=0;j<pAAR->np_y+2*pAAR->FDn;j++) {
-          free(phi_new[k][j]);
-          free(phi_old[k][j]);
-          free(phi_res[k][j]);
-          free(phi_temp[k][j]);
-        }
-        free(phi_new[k]);
-        free(phi_old[k]);
-        free(phi_res[k]);
-        free(phi_temp[k]);
-    }
-    free(phi_new);
-    free(phi_old);
-    free(phi_res);
-    free(phi_temp);
+    // for (k = 0; k<np_z+2*FDn; k++) {
+    //     for (j = 0; j<np_y+2*FDn; j++) {
+    //       free(x_new[k][j]); 
+    //       free(x_old[k][j]); 
+    //       free(x_res[k][j]); 
+    //       free(x_temp[k][j]); 
+    //     }
+    //     free(x_new[k]); 
+    //     free(x_old[k]); 
+    //     free(x_res[k]); 
+    //     free(x_temp[k]); 
+    // }
+    // free(x_new); 
+    // free(x_old); 
+    // free(x_res); 
+    // free(x_temp); 
 
-    free(phi_res_vec);
-    free(phi_old_vec);
-    free(Xold);
-    free(Fold);
-    free(am_vec);
+    free(res); 
+    // free(x_old); 
+    free(x_old); 
+    free(f_old); 
+    free(am_vec); 
   
-    for (k=0;k<m_aar;k++) {
-      free(DX[k]);
-      free(DF[k]);
+    for (k = 0; k<m; k++) {
+      free(DX[k]); 
+      free(DF[k]); 
     }
-    free(DX);
-    free(DF);
+    free(DX); 
+    free(DF); 
 
-    free(FtF);
-    free(Ftf);
-    free(svec);
-    free(allredvec);
+    free(FtF); 
+    free(Ftf); 
+    free(svec); 
+    free(allredvec); 
 }
+
+// void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis){
+//     int i, j, k, ctr = 0;
+//     for (k = 0; k < np_z; k++) 
+//         for (j = 0; j < np_y; j++) 
+//             for (i = 0; i < np_x; i++)             
+//                 vector[ctr++] = vector_3d[k+dis][j+dis][i+dis]; 
+// }
+
+// z = x + alpha * y
+void AXPY(double *z, double *x, double *y, double alpha, int np_x, int np_y, int np_z){
+    int i, j, k, ctr = 0;
+    if (y != NULL && alpha == -1.0) {
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                        z[ctr++] = x[ctr] - y[ctr]; 
+    }
+
+    if (y != NULL && alpha != -1.0) {
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                        z[ctr++] = x[ctr] + alpha * y[ctr]; 
+    }
+
+    if (y == NULL) {
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                        z[ctr++] = x[ctr];
+    }
+}
+
+void vec_dot_product(double *s, double *x, double *y, int np_x, int np_y, int np_z){
+    int i, j, k, ctr = 0;
+    *s = 0;
+    for (k = 0; k < np_z; k++) 
+        for (j = 0; j < np_y; j++) 
+            for (i = 0; i < np_x; i++) 
+                *s += x[ctr] * y[ctr++]; 
+}
+
+// z = x + alpha * y - v + s 
+void AXPYMvPs_3d(double ***z, double ***x, double ***y, double *v, double alpha, double s, int np_x, int np_y, int np_z, int dis){
+    int i, j, k, ctr = 0;
+    if (v == NULL && y != NULL && s ==0){
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis] + alpha * y[k+dis][j+dis][i+dis];
+    }
+
+    if (v == NULL && y == NULL && s ==0){
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis];
+    }
+
+    if (v != NULL && y != NULL && s ==0){
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis] + alpha * y[k+dis][j+dis][i+dis] - v[ctr++];
+    }
+
+    if (v == NULL && y == NULL && s !=0) {
+        for (k = 0; k < np_z; k++) 
+            for (j = 0; j < np_y; j++) 
+                for (i = 0; i < np_x; i++) 
+                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis] + s;
+    }
+}
+
+

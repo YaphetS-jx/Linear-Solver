@@ -16,8 +16,8 @@ NEED nproc to be perfect cube
     beta_aar - AAR solver parameter (Anderson relaxation)
     
 (5) Running the code: (e.g. for 64 processors)
-            % mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./aar tol m p omega beta
+            % mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./mpi_real tol m p omega beta
             
-           mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./aar 1e-6 13 11 1.0 0.9 -log_summary>test.out
+           mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 8 ./mpi_real 1e-6 13 11 1.0 0.9 -log_summary>test.out
 	   
 (6) The executable (aar) is created in the root directory and the source code is in the file named AAR.c. 
