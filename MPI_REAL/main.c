@@ -1,4 +1,3 @@
-
 /*=============================================================================================
 | Alternating Anderson Richardson (AAR), Periodic Galerkin Richardson (PGR), 
 | Periodic L2 Richardson (PL2R) code and tests in real-valued systems.
@@ -8,6 +7,7 @@
 |
 | Last Modified: 19 March 2020
 |-------------------------------------------------------------------------------------------*/
+
 
 #include "system.h"
 #include "AAR.h"
@@ -40,7 +40,7 @@ int main(int argc,  char ** argv) {
     if (rank  ==  0)
         printf("\n");       
 
-    Deallocate_memory(&aar);   ///< De-allocate memory.
+    Deallocate_memory(&aar);   /// <  De-allocate memory.
 
     t_end = MPI_Wtime(); 
     if (rank  ==  0)

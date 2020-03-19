@@ -3,8 +3,8 @@
  * @brief   This file contains functions for linear system, residual 
  *          function and precondition function.
  *
- * @author  Xin Jing <xjing30@gatech.edu>
- *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
+ * @author  Xin Jing  < xjing30@gatech.edu>
+ *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
  * 
  * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
  */
@@ -71,49 +71,49 @@ void Initialize(DS_AAR* pAAR) {
     Processor_domain(pAAR); 
 
     // allocate memory to store phi(x) in domain 
-    pAAR->phi = (double***) calloc((pAAR->np_z+2*pAAR->FDn),  sizeof(double**));  // need to de-allocate later
+    pAAR->phi = (double***) calloc((pAAR->np_z+2*pAAR->FDn),  sizeof(double**));  
     assert(pAAR->phi !=  NULL); 
 
-    for (k = 0; k<pAAR->np_z+2*pAAR->FDn; k++) {
-        pAAR->phi[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn),  sizeof(double*));  // need to de-allocate later
+    for (k = 0; k < pAAR->np_z+2*pAAR->FDn; k++) {
+        pAAR->phi[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn),  sizeof(double*));  
         assert(pAAR->phi[k] !=  NULL); 
 
-        for (j = 0; j<pAAR->np_y+2*pAAR->FDn; j++) {
-            pAAR->phi[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn),  sizeof(double));  // need to de-allocate later
+        for (j = 0; j < pAAR->np_y+2*pAAR->FDn; j++) {
+            pAAR->phi[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn),  sizeof(double));  
             assert(pAAR->phi[k][j] !=  NULL); 
         }
     }
 
-    pAAR->res = (double***) calloc((pAAR->np_z+2*pAAR->FDn),  sizeof(double**));  // need to de-allocate later
+    pAAR->res = (double***) calloc((pAAR->np_z+2*pAAR->FDn),  sizeof(double**));  
     assert(pAAR->res !=  NULL); 
 
-    for (k = 0; k<pAAR->np_z+2*pAAR->FDn; k++) {
-        pAAR->res[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn),  sizeof(double*));  // need to de-allocate later
+    for (k = 0; k < pAAR->np_z+2*pAAR->FDn; k++) {
+        pAAR->res[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn),  sizeof(double*));  
         assert(pAAR->res[k] !=  NULL); 
 
-        for (j = 0; j<pAAR->np_y+2*pAAR->FDn; j++) {
-            pAAR->res[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn),  sizeof(double));  // need to de-allocate later
+        for (j = 0; j < pAAR->np_y+2*pAAR->FDn; j++) {
+            pAAR->res[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn),  sizeof(double));  
             assert(pAAR->res[k][j] !=  NULL); 
         }
     }
 
-    pAAR->rhs = (double***) calloc(pAAR->np_z,  sizeof(double**));  // need to de-allocate later 
-    for (k = 0; k<pAAR->np_z; k++) {
+    pAAR->rhs = (double***) calloc(pAAR->np_z,  sizeof(double**));   
+    for (k = 0; k < pAAR->np_z; k++) {
         pAAR->rhs[k] = (double**) calloc(pAAR->np_y,  sizeof(double*));  // need to de-allocate 
-        for (j = 0; j<pAAR->np_y; j++) {
-            pAAR->rhs[k][j] = (double*) calloc(pAAR->np_x,  sizeof(double));  // need to de-allocate later
+        for (j = 0; j < pAAR->np_y; j++) {
+            pAAR->rhs[k][j] = (double*) calloc(pAAR->np_x,  sizeof(double));  
         }
     }
 
-    pAAR->phi_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z,  sizeof(double));  // need to de-allocate later
-    pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z,  sizeof(double));  // need to de-allocate later
+    pAAR->phi_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z,  sizeof(double));  
+    pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z,  sizeof(double));  
 
       // random RHS -------------------------------
     srand(rank);   
     double rhs_sum = 0, rhs_sum_global; 
-    for (k = 0; k<pAAR->np_z; k++) {
-        for (j = 0; j<pAAR->np_y; j++) {
-            for (i = 0; i<pAAR->np_x; i++) {
+    for (k = 0; k < pAAR->np_z; k++) {
+        for (j = 0; j < pAAR->np_y; j++) {
+            for (i = 0; i < pAAR->np_x; i++) {
                 pAAR->rhs[k][j][i] = (2*((double)(rand()) / (double)(RAND_MAX))-1); 
                 rhs_sum+= pAAR->rhs[k][j][i]; 
             }
@@ -122,9 +122,9 @@ void Initialize(DS_AAR* pAAR) {
     MPI_Allreduce(&rhs_sum,  &rhs_sum_global,  1,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
     rhs_sum_global = rhs_sum_global/(pAAR->n_int[0]*pAAR->n_int[1]*pAAR->n_int[2]); 
       //rhs_sum = 0; 
-    for (k = 0; k<pAAR->np_z; k++) {
-        for (j = 0; j<pAAR->np_y; j++) {
-            for (i = 0; i<pAAR->np_x; i++) {
+    for (k = 0; k < pAAR->np_z; k++) {
+        for (j = 0; j < pAAR->np_y; j++) {
+            for (i = 0; i < pAAR->np_x; i++) {
                 pAAR->rhs[k][j][i] = pAAR->rhs[k][j][i]-rhs_sum_global;  
                 //rhs_sum+= pAAR->rhs[k][j][i]; 
             }
@@ -133,9 +133,9 @@ void Initialize(DS_AAR* pAAR) {
     // ---------------------------------------------
 
     srand(rank+pAAR->nproc);  
-    for (k = 0; k<pAAR->np_z; k++) {
-        for (j = 0; j<pAAR->np_z; j++) {
-            for (i = 0; i<pAAR->np_z; i++) {
+    for (k = 0; k < pAAR->np_z; k++) {
+        for (j = 0; j < pAAR->np_z; j++) {
+            for (i = 0; i < pAAR->np_z; i++) {
                 pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = 1/*(2*((double)(rand()) / (double)(RAND_MAX))-1)*/; 
             }
         }
@@ -184,14 +184,14 @@ void Read_input(DS_AAR* pAAR) {
 // Compute Finite Difference coefficients for Laplacian (Del^2)
     pAAR->coeff_lap = (double*) calloc((pAAR->FDn+1),  sizeof(double)); 
     pAAR->coeff_lap[0] = 0; 
-    for (p = 1;  p<= pAAR->FDn;  p++)
+    for (p = 1;  p <= pAAR->FDn;  p++)
         pAAR->coeff_lap[0]+=  -(2.0/(p*p)); 
 
-    for (p = 1;  p<= pAAR->FDn;  p++) {
+    for (p = 1;  p <= pAAR->FDn;  p++) {
         Nr = 1; Dr = 1; 
-        for (i = pAAR->FDn-p+1;  i<= pAAR->FDn;  i++)
+        for (i = pAAR->FDn-p+1;  i <= pAAR->FDn;  i++)
             Nr*= i; 
-        for (i = pAAR->FDn+1;  i<= pAAR->FDn+p;  i++)
+        for (i = pAAR->FDn+1;  i <= pAAR->FDn+p;  i++)
             Dr*= i; 
         val = Nr/Dr; 
         pAAR->coeff_lap[p] = (2*pow(-1, p+1)*val/(p*p));  
@@ -223,9 +223,9 @@ void Processor_domain(DS_AAR* pAAR) {
     
     // Based on the current processor's rank,  compute the processor domain end nodes,  ordering the processors as z, y, x
     count = 0; 
-    for (countx = 0; countx<pAAR->nprocx; countx++) { // loop over all processors count
-        for (county = 0; county<pAAR->nprocy; county++){
-            for (countz = 0; countz<pAAR->nprocz; countz++) {
+    for (countx = 0; countx < pAAR->nprocx; countx++) { // loop over all processors count
+        for (county = 0; county < pAAR->nprocy; county++){
+            for (countz = 0; countz < pAAR->nprocz; countz++) {
                 if (rank  ==  count) { // current processor        
                     // no. of nodes in each direction of current processor domain
                     ndpx_curr = ndpx; 
@@ -270,11 +270,11 @@ void Comm_topologies(DS_AAR* pAAR) {
 
     int nneigh = 6*ceil((double)(pAAR->FDn-(1e-12))/pAAR->np_x);  // total number of neighbors
     int *neighs, count = 0; 
-    neighs = (int*) calloc(nneigh,  sizeof(int));  // need to de-allocate later
-    pAAR->neighs_lap = (int*) calloc(nneigh,  sizeof(int));  // need to de-allocate later
+    neighs = (int*) calloc(nneigh,  sizeof(int));  
+    pAAR->neighs_lap = (int*) calloc(nneigh,  sizeof(int));  
 
     int proc_l, proc_r, proc_u, proc_d, proc_f, proc_b;  // procs on left, right,  up, down,  front, back of the current proc
-    for (j = 0; j<ceil((double)(pAAR->FDn-(1e-12))/pAAR->np_x); j++) { // no. of layers of nearest neighbors required for FD stencil
+    for (j = 0; j < ceil((double)(pAAR->FDn-(1e-12))/pAAR->np_x); j++) { // no. of layers of nearest neighbors required for FD stencil
         MPI_Cart_shift(topocomm, 0, j+1, &proc_l, &proc_r);   // x-direction
         MPI_Cart_shift(topocomm, 1, j+1, &proc_b, &proc_f);   // y-direction
         MPI_Cart_shift(topocomm, 2, j+1, &proc_d, &proc_u);   // z-direction
@@ -319,8 +319,8 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
     int np_edge = FDn*np*np;  // no. of nodes in the stencil communication region across each face of processor domain. Six such regions communicate.
     int i, j, k, a, edge_count, neigh_count, proc_dir, proc_lr; 
     double *phi_edge_in, *phi_edge_out;  // linear array to store input and output communication data/buffer to and from the processor
-    phi_edge_in = (double*) calloc(6*np_edge,  sizeof(double));  // need to de-allocate later
-    phi_edge_out = (double*) calloc(6*np_edge,  sizeof(double));  // need to de-allocate later 
+    phi_edge_in = (double*) calloc(6*np_edge,  sizeof(double));  
+    phi_edge_out = (double*) calloc(6*np_edge,  sizeof(double));   
     double lap_phi_k,  TEMP_TOL = 1e-12; 
     int neigh_level, nneigh = ceil((double)(FDn-TEMP_TOL)/np); 
     double ***rhs = pAAR->rhs;
@@ -336,13 +336,13 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
     // Setup the outgoing array phi_edge_out with the phi values from edges of the proc domain. Order: First loop over procs x, y, z direc and then for each proc,  x, y, z over nodes in the edge region
     edge_count = 0; 
     neigh_count = 0; 
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
                 // Now read phi values in the edge region into the array
-                for (k = eout_s[2][neigh_count]; k<= eout_e[2][neigh_count]; k++) { // z-direction of edge region
-                    for (j = eout_s[1][neigh_count]; j<= eout_e[1][neigh_count]; j++) { // y-direction of edge region
-                        for (i = eout_s[0][neigh_count]; i<= eout_e[0][neigh_count]; i++) { // x-direction of edge region
+                for (k = eout_s[2][neigh_count]; k <= eout_e[2][neigh_count]; k++) { // z-direction of edge region
+                    for (j = eout_s[1][neigh_count]; j <= eout_e[1][neigh_count]; j++) { // y-direction of edge region
+                        for (i = eout_s[0][neigh_count]; i <= eout_e[0][neigh_count]; i++) { // x-direction of edge region
                             phi_edge_out[edge_count] = phi_old[k+FDn][j+FDn][i+FDn]; 
                             edge_count = edge_count + 1; 
                         }
@@ -365,12 +365,12 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
         // Overlapping Computation with Communication when using non-blocking routines
         // Now find lap_phi and update phi using Jacobi iteration. Do this on interior and edge domains of proc domain separately so that we can use non-blocking communication
         // Update phi on the proc domain assuming it is zero outside the proc domain (will correct for this after stencil communication)
-        for (k = 0+FDn; k<= np-1+FDn; k++) { // z-direction of interior region
-            for (j = 0+FDn; j<= np-1+FDn; j++) { // y-direction of interior region
-                for (i = 0+FDn; i<= np-1+FDn; i++) { // x-direction of interior region
+        for (k = 0+FDn; k <= np-1+FDn; k++) { // z-direction of interior region
+            for (j = 0+FDn; j <= np-1+FDn; j++) { // y-direction of interior region
+                for (i = 0+FDn; i <= np-1+FDn; i++) { // x-direction of interior region
                     //i, j, k indices are w.r.t proc+FDn domain
                     lap_phi_k = phi_old[k][j][i]*3*pAAR->coeff_lap[0]; 
-                    for (a = 1; a<= FDn; a++) {
+                    for (a = 1; a <= FDn; a++) {
                         lap_phi_k +=  (phi_old[k][j][i-a] + phi_old[k][j][i+a] + phi_old[k][j-a][i] + phi_old[k][j+a][i] + phi_old[k-a][j][i] + phi_old[k+a][j][i])*pAAR->coeff_lap[a];                  
                     }
                     phi_res[k][j][i] = -(((4*M_PI)*(rhs[k-FDn][j-FDn][i-FDn]) + lap_phi_k)/(3*pAAR->coeff_lap[0]));  // Jacobi update for nodes in interior of proc domain
@@ -386,13 +386,13 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
     // Store the incoming buffer data from phi_edge_in into the outer stencil regions of phi_old array
     neigh_count = 0; 
     edge_count = 0; 
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
               // Now read phi values in the edge region into the array
-                for (k = ein_s[2][neigh_count]; k<= ein_e[2][neigh_count]; k++) { // z-direction of edge region
-                    for (j = ein_s[1][neigh_count]; j<= ein_e[1][neigh_count]; j++) { // y-direction of edge region
-                        for (i = ein_s[0][neigh_count]; i<= ein_e[0][neigh_count]; i++) { // x-direction of edge region
+                for (k = ein_s[2][neigh_count]; k <= ein_e[2][neigh_count]; k++) { // z-direction of edge region
+                    for (j = ein_s[1][neigh_count]; j <= ein_e[1][neigh_count]; j++) { // y-direction of edge region
+                        for (i = ein_s[0][neigh_count]; i <= ein_e[0][neigh_count]; i++) { // x-direction of edge region
                             phi_old[k][j][i] = phi_edge_in[edge_count]; 
                             edge_count = edge_count + 1; 
                         }
@@ -404,13 +404,13 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
     }
 
 
-    if (np <=  2*FDn) { // Assuming that we are not using non-blocking
-        for (k = 0+FDn; k<= np-1+FDn; k++) { // z-direction of interior region
-            for (j = 0+FDn; j<= np-1+FDn; j++) { // y-direction of interior region
-                for (i = 0+FDn; i<= np-1+FDn; i++) { // x-direction of interior region
+    if (np  <=  2*FDn) { // Assuming that we are not using non-blocking
+        for (k = 0+FDn; k <= np-1+FDn; k++) { // z-direction of interior region
+            for (j = 0+FDn; j <= np-1+FDn; j++) { // y-direction of interior region
+                for (i = 0+FDn; i <= np-1+FDn; i++) { // x-direction of interior region
                     //i, j, k indices are w.r.t proc+FDn domain
                     lap_phi_k = phi_old[k][j][i]*3*pAAR->coeff_lap[0]; 
-                    for (a = 1; a<= FDn; a++) {
+                    for (a = 1; a <= FDn; a++) {
                         lap_phi_k +=  (phi_old[k][j][i-a] + phi_old[k][j][i+a] + phi_old[k][j-a][i] + phi_old[k][j+a][i] + phi_old[k-a][j][i] + phi_old[k+a][j][i])*pAAR->coeff_lap[a];                  
                     }
                         phi_res[k][j][i] = -(((4*M_PI)*(rhs[k-FDn][j-FDn][i-FDn]) + lap_phi_k)/(3*pAAR->coeff_lap[0]));  // Jacobi update for nodes in interior of proc domain
@@ -421,20 +421,20 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
 
     if (np > 2*FDn) {
         int temp = 0; 
-        for (neigh_count = 0; neigh_count<26; neigh_count++) {
-            for (k = pAAR->LapInd.ereg_s[2][neigh_count]; k<= pAAR->LapInd.ereg_e[2][neigh_count]; k++) { // z-direction of edge region
-                for (j = pAAR->LapInd.ereg_s[1][neigh_count]; j<= pAAR->LapInd.ereg_e[1][neigh_count]; j++) { // y-direction of edge region
-                    for (i = pAAR->LapInd.ereg_s[0][neigh_count]; i<= pAAR->LapInd.ereg_e[0][neigh_count]; i++) { // x-direction of edge region
+        for (neigh_count = 0; neigh_count < 26; neigh_count++) {
+            for (k = pAAR->LapInd.ereg_s[2][neigh_count]; k <= pAAR->LapInd.ereg_e[2][neigh_count]; k++) { // z-direction of edge region
+                for (j = pAAR->LapInd.ereg_s[1][neigh_count]; j <= pAAR->LapInd.ereg_e[1][neigh_count]; j++) { // y-direction of edge region
+                    for (i = pAAR->LapInd.ereg_s[0][neigh_count]; i <= pAAR->LapInd.ereg_e[0][neigh_count]; i++) { // x-direction of edge region
                         //i, j, k indexes are w.r.t proc domain,  but phi_old and new arrays are on proc+FDn domain
                             lap_phi_k = 0.0;  
                             
-                        for (a = (edge_ind[0][temp]+1); a<= FDn; a++)  // x-direction
+                        for (a = (edge_ind[0][temp]+1); a <= FDn; a++)  // x-direction
                             lap_phi_k +=  (phi_old[k+FDn][j+FDn][i+FDn-stencil_sign[0][temp]*a])*pAAR->coeff_lap[a];  // part of the other half stencil inside domain
                         
-                        for (a = (edge_ind[1][temp]+1); a<= FDn; a++)  // y-direction
+                        for (a = (edge_ind[1][temp]+1); a <= FDn; a++)  // y-direction
                             lap_phi_k +=  (phi_old[k+FDn][j+FDn-stencil_sign[1][temp]*a][i+FDn])*pAAR->coeff_lap[a];  // part of the other half stencil inside domain
 
-                        for (a = (edge_ind[2][temp]+1); a<= FDn; a++)  // z-direction
+                        for (a = (edge_ind[2][temp]+1); a <= FDn; a++)  // z-direction
                             lap_phi_k +=  (phi_old[k+FDn-stencil_sign[2][temp]*a][j+FDn][i+FDn])*pAAR->coeff_lap[a];  // part of the other half stencil inside domain
                         
                         phi_res[k+FDn][j+FDn][i+FDn] +=  -((lap_phi_k)/(3*pAAR->coeff_lap[0]));  // Jacobi update for nodes in edge region of proc domain
@@ -468,19 +468,19 @@ void Laplacian_Comm_Indices(DS_AAR* pAAR) {
     pAAR->LapInd.ncounts_send = (int*) calloc(nneigh,  sizeof(int)); 
     pAAR->LapInd.displs_recv = (int*) calloc(nneigh,  sizeof(int)); 
     pAAR->LapInd.ncounts_recv = (int*) calloc(nneigh,  sizeof(int)); 
-    pAAR->LapInd.eout_s = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    pAAR->LapInd.eout_e = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    pAAR->LapInd.ein_s = (int**) calloc(3,  sizeof(int*)); ;  // need to de-allocate later
-    pAAR->LapInd.ein_e = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    pAAR->LapInd.stencil_sign = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    pAAR->LapInd.edge_ind = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    for (k = 0; k<3; k++) {
-        pAAR->LapInd.eout_s[k] = (int*) calloc(nneigh,  sizeof(int));  // need to de-allocate later
-        pAAR->LapInd.eout_e[k] = (int*) calloc(nneigh,  sizeof(int));  // need to de-allocate later
-        pAAR->LapInd.ein_s[k] = (int*) calloc(nneigh,  sizeof(int));  // need to de-allocate later
-        pAAR->LapInd.ein_e[k] = (int*) calloc(nneigh,  sizeof(int));  // need to de-allocate later
+    pAAR->LapInd.eout_s = (int**) calloc(3,  sizeof(int*));  
+    pAAR->LapInd.eout_e = (int**) calloc(3,  sizeof(int*));  
+    pAAR->LapInd.ein_s = (int**) calloc(3,  sizeof(int*)); ;  
+    pAAR->LapInd.ein_e = (int**) calloc(3,  sizeof(int*));  
+    pAAR->LapInd.stencil_sign = (int**) calloc(3,  sizeof(int*));  
+    pAAR->LapInd.edge_ind = (int**) calloc(3,  sizeof(int*));  
+    for (k = 0; k < 3; k++) {
+        pAAR->LapInd.eout_s[k] = (int*) calloc(nneigh,  sizeof(int));  
+        pAAR->LapInd.eout_e[k] = (int*) calloc(nneigh,  sizeof(int));  
+        pAAR->LapInd.ein_s[k] = (int*) calloc(nneigh,  sizeof(int));  
+        pAAR->LapInd.ein_e[k] = (int*) calloc(nneigh,  sizeof(int));  
         num = pAAR->FDn*pAAR->FDn*pAAR->FDn*8 + pAAR->FDn*pAAR->FDn*(pAAR->np_x-2*pAAR->FDn)*12 + pAAR->FDn*(pAAR->np_x-2*pAAR->FDn)*(pAAR->np_x-2*pAAR->FDn)*6; 
-        pAAR->LapInd.stencil_sign[k] = (int*) calloc(num,  sizeof(int));  // need to de-allocate later
+        pAAR->LapInd.stencil_sign[k] = (int*) calloc(num,  sizeof(int));  
         pAAR->LapInd.edge_ind[k] = (int*) calloc(num,  sizeof(int)); 
     }
 
@@ -506,9 +506,9 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     // Setup the outgoing array phi_edge_out with the phi values from edges of the proc domain. Order: First loop over procs x, y, z direc and then for each proc,  x, y, z over nodes in the edge region
     edge_count = 0; 
     displs_send[0] = 0; 
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
                 // store neighbor information
                 ncounts_send[edge_count] = pAAR->np_x*pAAR->np_y*pAAR->np_z;  // no. of nodes to be communicated to this neighbor
                 if (edge_count>0)
@@ -539,11 +539,11 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     }
 
     int **ein_s_temp, **ein_e_temp; 
-    ein_s_temp = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    ein_e_temp = (int**) calloc(3,  sizeof(int*));  // need to de-allocate later
-    for (k = 0; k<3; k++) {
-        ein_s_temp[k] = (int*) calloc(6*nneigh,  sizeof(int));  // need to de-allocate later
-        ein_e_temp[k] = (int*) calloc(6*nneigh,  sizeof(int));  // need to de-allocate later      
+    ein_s_temp = (int**) calloc(3,  sizeof(int*));  
+    ein_e_temp = (int**) calloc(3,  sizeof(int*));  
+    for (k = 0; k < 3; k++) {
+        ein_s_temp[k] = (int*) calloc(6*nneigh,  sizeof(int));  
+        ein_e_temp[k] = (int*) calloc(6*nneigh,  sizeof(int));        
     }
 
     int *mark_off, *send_ind_arry;  
@@ -553,13 +553,13 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
 
     // Store the incoming buffer data from phi_edge_in into the outer stencil regions of phi_old array
     edge_count = 0; 
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
                 ccnt = 0; ctr = 0; 
-                for (kk = 0; kk<nneigh; kk++) { // neigh_level
-                    for (jj = 0; jj<3; jj++) { // proc_dir
-                        for (ii = 0; ii<2; ii++) { // proc_lr
+                for (kk = 0; kk < nneigh; kk++) { // neigh_level
+                    for (jj = 0; jj < 3; jj++) { // proc_dir
+                        for (ii = 0; ii < 2; ii++) { // proc_lr
                             if (pAAR->neighs_lap[ccnt]  ==  pAAR->neighs_lap[edge_count] && mark_off[ccnt]  ==  0) {
                                 rep_dist = kk*6 + jj*2 + (1-ii);  // [ii, jj, kk] relative current proc would have been kk*6 + 2*jj + ii
                                 rep_ind = ccnt; 
@@ -570,7 +570,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
                                 }
 
                                 if (ctr>0) {
-                                    if (rep_dist<rep_dist_old) {
+                                    if (rep_dist < rep_dist_old) {
                                         rep_dist_old = rep_dist; 
                                         rep_ind_old = rep_ind; 
                                     }
@@ -596,9 +596,9 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
 
     // find displs_recv
     edge_count = 0;  displs_recv[0] = 0; 
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
                 if (edge_count>0)
                     displs_recv[edge_count] = displs_recv[edge_count-1]+ncounts_recv[edge_count-1];  // relative displacement of index in out going array 
                 edge_count +=  1; 
@@ -608,9 +608,9 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
 
     // Store the incoming buffer data from phi_edge_in into the outer stencil regions of phi_old array
     edge_count = 0; 
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
 
                 // for each neigh proc,  compute start and end nodes of the communication region of size FDn x np x np
                 edge_s[0] = pAAR->FDn-1+1; edge_s[1] = pAAR->FDn-1+1; edge_s[2] = pAAR->FDn-1+1;  // initialize all start nodes to start node of proc domain i.e. FDn-1+1 (w.r.t proc+FDn)
@@ -648,9 +648,9 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     // Now loop again and find the proper order of the indices for the recv buffer based on send_ind_arry that was used to set up ncounts_recv
     // compute the start/end indices of the regions for incoming buffers. Indices w.r.t proc+FDn domain
     edge_count = 0;  
-    for (neigh_level = 0; neigh_level<nneigh; neigh_level++) { // loop over layers of nearest neighbors
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+    for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
                 ein_s[0][edge_count] = ein_s_temp[0][send_ind_arry[edge_count]];  ein_e[0][edge_count] = ein_e_temp[0][send_ind_arry[edge_count]]; 
                 ein_s[1][edge_count] = ein_s_temp[1][send_ind_arry[edge_count]];  ein_e[1][edge_count] = ein_e_temp[1][send_ind_arry[edge_count]]; 
                 ein_s[2][edge_count] = ein_s_temp[2][send_ind_arry[edge_count]];  ein_e[2][edge_count] = ein_e_temp[2][send_ind_arry[edge_count]]; 
@@ -665,8 +665,8 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
 
         edge_count = 0; 
         // loop over 6 faces = 3x2
-        for (proc_dir = 0; proc_dir<3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
-            for (proc_lr = 0; proc_lr<2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
+        for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
+            for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
                 edge_s[0] = 0+pAAR->FDn; edge_s[1] = 0+pAAR->FDn; edge_s[2] = 0+pAAR->FDn;  // initialize all start nodes to start node of proc domain-FDn i.e. zero+FDn
                 edge_e[0] = np-1-pAAR->FDn; edge_e[1] = np-1-pAAR->FDn; edge_e[2] = np-1-pAAR->FDn;  // initialize all end nodes to end node of proc domain-FDn i.e. np-1-FDn
                 if (proc_lr  ==  1) { // for right neigh proc
@@ -717,12 +717,12 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
         ereg_s[0][25] = np-pAAR->FDn;  ereg_e[0][25] = np-1;    ereg_s[1][25] = np-pAAR->FDn;  ereg_e[1][25] = np-1;          ereg_s[2][25] = np-pAAR->FDn;  ereg_e[2][25] = np-1; 
 
         int temp = 0; 
-        for (neigh_count = 0; neigh_count<26; neigh_count++) {
-            for (k = ereg_s[2][neigh_count]; k<= ereg_e[2][neigh_count]; k++) { // z-direction of edge region
-                for (j = ereg_s[1][neigh_count]; j<= ereg_e[1][neigh_count]; j++) { // y-direction of edge region
-                    for (i = ereg_s[0][neigh_count]; i<= ereg_e[0][neigh_count]; i++) { // x-direction of edge region
+        for (neigh_count = 0; neigh_count < 26; neigh_count++) {
+            for (k = ereg_s[2][neigh_count]; k <= ereg_e[2][neigh_count]; k++) { // z-direction of edge region
+                for (j = ereg_s[1][neigh_count]; j <= ereg_e[1][neigh_count]; j++) { // y-direction of edge region
+                    for (i = ereg_s[0][neigh_count]; i <= ereg_e[0][neigh_count]; i++) { // x-direction of edge region
                         //i, j, k indices are w.r.t proc domain,  but phi_old and new arrays are on proc+FDn domain
-                        if (i-0 <=  np-1-i) { // index i closer to left edge
+                        if (i-0  <=  np-1-i) { // index i closer to left edge
                             stencil_sign[0][temp] = 1;  // full half stencil can be updated on right side
                             edge_ind[0][temp] = min(pAAR->FDn, i-0); 
                         } else { // index i closer to right edge
@@ -731,7 +731,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
                             edge_ind[0][temp] = min(pAAR->FDn, np-1-i); 
                         }
 
-                        if (j-0 <=  np-1-j) { // index i closer to left edge
+                        if (j-0  <=  np-1-j) { // index i closer to left edge
                             stencil_sign[1][temp] = 1;  // full half stencil can be updated on right side
                             edge_ind[1][temp] = min(pAAR->FDn, j-0); 
                         } else { // index i closer to right edge
@@ -739,7 +739,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
                             edge_ind[1][temp] = min(pAAR->FDn, np-1-j); 
                         }
 
-                        if (k-0 <=  np-1-k) { // index i closer to left edge
+                        if (k-0  <=  np-1-k) { // index i closer to left edge
                             stencil_sign[2][temp] = 1;  // full half stencil can be updated on right side
                             edge_ind[2][temp] = min(pAAR->FDn, k-0); 
                         } else { // index i closer to right edge
@@ -754,7 +754,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     } // end if condition (pAAR->np_x > 2*pAAR->FDn)
 
   // de-allocate memory
-    for (k = 0; k<3; k++) {
+    for (k = 0; k < 3; k++) {
         free(ein_s_temp[k]); 
         free(ein_e_temp[k]); 
     }
@@ -779,8 +779,8 @@ void Deallocate_memory(DS_AAR* pAAR)  {
     free(pAAR->coeff_lap); 
     
     // de-allocate rhs
-    for (k = 0; k<pAAR->np_z; k++) {
-        for (j = 0; j<pAAR->np_y; j++) {
+    for (k = 0; k < pAAR->np_z; k++) {
+        for (j = 0; j < pAAR->np_y; j++) {
             free(pAAR->rhs[k][j]); 
         }
         free(pAAR->rhs[k]); 
@@ -789,8 +789,8 @@ void Deallocate_memory(DS_AAR* pAAR)  {
     free(pAAR->rhs_v); 
 
     // de-allocate phi
-    for (k = 0; k<pAAR->np_z+2*pAAR->FDn; k++) {
-        for (j = 0; j<pAAR->np_y+2*pAAR->FDn; j++) {
+    for (k = 0; k < pAAR->np_z+2*pAAR->FDn; k++) {
+        for (j = 0; j < pAAR->np_y+2*pAAR->FDn; j++) {
             free(pAAR->phi[k][j]); 
             free(pAAR->res[k][j]);
         }
@@ -805,7 +805,7 @@ void Deallocate_memory(DS_AAR* pAAR)  {
     free(pAAR->neighs_lap); 
 
   // de-allocate Laplacian comm 
-    for (k = 0; k<3; k++) {
+    for (k = 0; k < 3; k++) {
         free(pAAR->LapInd.eout_s[k]); 
         free(pAAR->LapInd.eout_e[k]); 
         free(pAAR->LapInd.ein_s[k]); 

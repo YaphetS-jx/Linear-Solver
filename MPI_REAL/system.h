@@ -3,8 +3,8 @@
  * @brief   This file declares the functions for the linear system, residual 
  *          function and precondition function.
  *
- * @author  Xin Jing <xjing30@gatech.edu>
- *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
+ * @author  Xin Jing  < xjing30@gatech.edu>
+ *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
  * 
  * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
  */
@@ -13,13 +13,13 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#include <math.h>
-#include <time.h>   // CLOCK
-#include <stdio.h>
-#include <stdlib.h> 
-#include <string.h>
-#include <mpi.h>
-#include <assert.h>
+#include  <math.h>
+#include  <time.h>   // CLOCK
+#include  <stdio.h>
+#include  <stdlib.h> 
+#include  <string.h>
+#include  <mpi.h>
+#include  <assert.h>
 
 #define M_PI 3.14159265358979323846
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -30,29 +30,29 @@ typedef struct {
 }DS_LapInd;
 
 typedef struct {
-    int nproc;                     ///< Total number of processors
-    int nprocx,nprocy,nprocz;      ///< Number of processors in each direction of domain
-    int pnode_s[3];                ///< Processor domain start nodes' indices w.r.t main (starts from 0)
-    int pnode_e[3];                ///< Processor domain end nodes' indices w.r.t main (starts from 0)
-    int np_x,np_y,np_z;            ///< Number of finite difference nodes in each direction of processor domain
-    int FDn;                       ///< Half-the order of finite difference
-    int n_int[3];                  ///< Number of finite difference intervals in each direction of main domain
-    double* coeff_lap;             ///< Finite difference coefficients for Laplacian
-    double ***rhs;                 ///< Right hand side of the linear equation
-    double *rhs_v;                 ///< Right hand side of the linear equation
-    double ***res;                 ///< residual of linear equation
-    DS_LapInd LapInd;              ///< Object for Laplacian communication information
-    double solver_tol;             ///< Convergence tolerance for AAR solver
-    int solver_maxiter;            ///< Maximum number of iterations allowed in the AAR solver
-    int *neighs_lap;               ///< Array of neighboring processor ranks in the Laplacian stencil width from current processor
-    double omega_aar;              ///< Richardson relaxation parameter
-    double beta_aar;               ///< Anderson relaxation parameter
-    int m_aar;                     ///< Number of iterates in Anderson mixing = m_aar+1
-    int p_aar;                     ///< AAR parameter. Anderson update done every p_aar iteration of AAR solver
-    int non_blocking;              ///< Option that indicates using non-blocking version of MPI command. 1=TRUE or 0=FALSE (for MPI collectives)
-    double ***phi;                 ///< Unknown variable of the linear equation
-    double *phi_v;                 ///< Unknown variable of the linear equation
-    MPI_Comm comm_laplacian;       ///< Communicator topology for Laplacian
+    int nproc;                     /// <  Total number of processors
+    int nprocx,nprocy,nprocz;      /// <  Number of processors in each direction of domain
+    int pnode_s[3];                /// <  Processor domain start nodes' indices w.r.t main (starts from 0)
+    int pnode_e[3];                /// <  Processor domain end nodes' indices w.r.t main (starts from 0)
+    int np_x,np_y,np_z;            /// <  Number of finite difference nodes in each direction of processor domain
+    int FDn;                       /// <  Half-the order of finite difference
+    int n_int[3];                  /// <  Number of finite difference intervals in each direction of main domain
+    double* coeff_lap;             /// <  Finite difference coefficients for Laplacian
+    double ***rhs;                 /// <  Right hand side of the linear equation
+    double *rhs_v;                 /// <  Right hand side of the linear equation
+    double ***res;                 /// <  residual of linear equation
+    DS_LapInd LapInd;              /// <  Object for Laplacian communication information
+    double solver_tol;             /// <  Convergence tolerance for AAR solver
+    int solver_maxiter;            /// <  Maximum number of iterations allowed in the AAR solver
+    int *neighs_lap;               /// <  Array of neighboring processor ranks in the Laplacian stencil width from current processor
+    double omega_aar;              /// <  Richardson relaxation parameter
+    double beta_aar;               /// <  Anderson relaxation parameter
+    int m_aar;                     /// <  Number of iterates in Anderson mixing = m_aar+1
+    int p_aar;                     /// <  AAR parameter. Anderson update done every p_aar iteration of AAR solver
+    int non_blocking;              /// <  Option that indicates using non-blocking version of MPI command. 1=TRUE or 0=FALSE (for MPI collectives)
+    double ***phi;                 /// <  Unknown variable of the linear equation
+    double *phi_v;                 /// <  Unknown variable of the linear equation
+    MPI_Comm comm_laplacian;       /// <  Communicator topology for Laplacian
 }DS_AAR;
 
 void CheckInputs(DS_AAR* pAAR,int argc, char ** argv); 

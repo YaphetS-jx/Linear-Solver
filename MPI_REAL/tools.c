@@ -1,9 +1,9 @@
 /**
  * @file    tools.c
- * @brief   This file contains related functions for 3 linear solvers.
+ * @brief   This file contains related functions for 3 linear solvers
  *
- * @author  Xin Jing <xjing30@gatech.edu>
- *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
+ * @author  Xin Jing  < xjing30@gatech.edu>
+ *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
  * 
  * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
  */
@@ -17,7 +17,7 @@ void Vector2Norm(double* Vec,  int len,  double* ResVal) { // Vec is the pointer
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
     double res = 0; 
-    for (k = 0; k<len; k++)
+    for (k = 0; k < len; k++)
         res = res + Vec[k]*Vec[k]; 
 
     double res_global; 
@@ -28,64 +28,56 @@ void Vector2Norm(double* Vec,  int len,  double* ResVal) { // Vec is the pointer
     *ResVal = res_global; 
 }
 
-// function to compute Anderson update vector
 
-
-
-void PseudoInverseTimesVec(double *Ac, double *b, double *x, int m) { // returns x = pinv(A)*b,  matrix A is m x m  but given in column major format Ac (so m^2 x 1) and vector b is m x 1
+void PseudoInverseTimesVec(double **A, double *b, double *x, int m) { // returns x = pinv(A)*b,  matrix A is m x m  and vector b is m x 1
 
     int i, j, k, ctr, jj; 
-    double **A, **U, **V, *w;  // A matrix in column major format as Ac. w is the array of singular values
-    A = (double**) calloc(m,  sizeof(double*));  // need to de-allocate later
-    U = (double**) calloc(m,  sizeof(double*));   // need to de-allocate later
+    double **U, **V, *w;  // A matrix in column major format as Ac. w is the array of singular values
+    U = (double**) calloc(m,  sizeof(double*));   
     V = (double**) calloc(m,  sizeof(double*)); 
-    for (k = 0; k<m; k++)
+    for (k = 0; k < m; k++)
     {
-      A[k] = (double*) calloc(m,  sizeof(double));  // need to de-allocate later
-      U[k] = (double*) calloc(m,  sizeof(double));   // need to de-allocate later
-      V[k] = (double*) calloc(m,  sizeof(double));   // need to de-allocate later
+      U[k] = (double*) calloc(m,  sizeof(double));   
+      V[k] = (double*) calloc(m,  sizeof(double));   
     }
-    w = (double*) calloc(m,  sizeof(double));   // need to de-allocate later
+    w = (double*) calloc(m,  sizeof(double));   
 
-    // convert column major to matrix form
-    ctr = 0; 
-    for (j = 0; j<m; j++) { // column index
-        for (i = 0; i<m; i++) { // row index
-            A[i][j] = Ac[ctr];  // (A)_ij element
+    for (j = 0; j < m; j++) { 
+        for (i = 0; i < m; i++) { 
             U[i][j] = A[i][j]; 
-            ctr = ctr + 1; 
         }
     }
 
     // Perform SVD on matrix A = UWV'.
-    SingularValueDecomp(U, m, m, w, V);  // While input,  U = A,  and while output U = U. Need to give output singular values which have been zeroed out if they are small
+    SingularValueDecomp(U, m, m, w, V); 
 
-    // Find Pseudoinverse times vector (pinv(A)*b = (V*diag(1/wj)*U')*b)
+    // Find Pseudoinverse times vector (pinv(A)*b = (V * diag(1/wj) * U') * b)
     double s, *tmp; 
-    tmp = (double*) calloc(m,  sizeof(double));  // need to de-allocate later
-    for (j = 0; j<m; j++) { // calculate U'*b
+    tmp = (double*) calloc(m,  sizeof(double));  
+    // diag(1/wj) * U'*b
+    for (j = 0; j < m; j++) { 
         s = 0.0; 
-        if (w[j]) { // nonzero result only if wj is nonzero
-            for (i = 0; i<m; i++) 
+        if (w[j]) { 
+            for (i = 0; i < m; i++) 
                 s +=  U[i][j]*b[i]; 
-            s /=  w[j];  // This is the divide by wj
+            s /=  w[j];  
         }
         tmp[j] = s; 
     }
-    for (j = 0; j<m; j++) { // Matrix multiply by V to get answer
+
+    // Matrix multiply by V to get answer
+    for (j = 0; j < m; j++) { 
         s = 0.0; 
-        for (jj = 0; jj<m; jj++) 
+        for (jj = 0; jj < m; jj++) 
             s +=  V[j][jj]*tmp[jj]; 
             x[j] = s; 
     }
 
-    for (k = 0; k<m; k++) {
-        free(A[k]); 
+    // de-allocate memory
+    for (k = 0; k < m; k++) {
         free(U[k]); 
         free(V[k]); 
     }
-
-    free(A); 
     free(U); 
     free(V); 
     free(w); 
@@ -97,18 +89,18 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
     int flag, i, its, j, jj, k, l, nm, Max_its = 250; 
     double anorm, c, f, g, h, s, scale, x, y, z, *rv1; 
 
-    rv1 = (double*) calloc(n,  sizeof(double));   // need to de-allocate later
+    rv1 = (double*) calloc(n,  sizeof(double));   
     g = scale = anorm = 0.0; 
     // Householder reduction to bidiagonal form
-    for (i = 0; i<n; i++) {
+    for (i = 0; i < n; i++) {
         l = i+1; 
         rv1[i] = scale*g; 
         g = s = scale = 0.0; 
-        if (i<m) {
-            for (k = i; k<m; k++) 
+        if (i < m) {
+            for (k = i; k < m; k++) 
                 scale +=  fabs(a[k][i]); 
             if (scale) {
-                for (k = i; k<m; k++) {
+                for (k = i; k < m; k++) {
                     a[k][i] /=  scale; 
                     s +=  a[k][i]*a[k][i]; 
                 }
@@ -117,24 +109,24 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
                 h = f*g-s; 
                 a[i][i] = f-g; 
                 for (j = 1;  j < n;  j++){
-                    for (s = 0.0, k = i; k<m; k++) 
+                    for (s = 0.0, k = i; k < m; k++) 
                         s +=  a[k][i]*a[k][j]; 
                     f = s/h; 
-                    for (k = i; k<m; k++) 
+                    for (k = i; k < m; k++) 
                         a[k][j] +=  f*a[k][i]; 
                 }
-                for (k = i; k<m; k++) 
+                for (k = i; k < m; k++) 
                     a[k][i] *=  scale; 
             }
         }
 
         w[i] = scale *g; 
         g = s = scale = 0.0; 
-        if (i<= m-1 && i!= n-1) {
-            for (k = l; k<n; k++) 
+        if (i <= m-1 && i!= n-1) {
+            for (k = l; k < n; k++) 
                 scale +=  fabs(a[i][k]); 
             if (scale) {
-                for (k = l; k<n; k++)
+                for (k = l; k < n; k++)
                  {
                     a[i][k] /=  scale; 
                     s +=  a[i][k]*a[i][k]; 
@@ -143,15 +135,15 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
                 g = -SIGN(sqrt(s), f); 
                 h = f*g-s; 
                 a[i][l] = f-g; 
-                for (k = l; k<n; k++) 
+                for (k = l; k < n; k++) 
                     rv1[k] = a[i][k]/h; 
-                for (j = l; j<m; j++) {
-                    for (s = 0.0, k = l; k<n; k++) 
+                for (j = l; j < m; j++) {
+                    for (s = 0.0, k = l; k < n; k++) 
                         s +=  a[j][k]*a[i][k]; 
-                    for (k = l; k<n; k++) 
+                    for (k = l; k < n; k++) 
                         a[j][k] +=  s*rv1[k]; 
                 }
-                for (k = l; k<n; k++) a[i][k] *=  scale; 
+                for (k = l; k < n; k++) a[i][k] *=  scale; 
             }
         }
 
@@ -161,19 +153,19 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
 
     // Accumulation of right-hand transformations
     for (i = n-1; i>= 0; i--) {
-        if (i<n-1) {
+        if (i < n-1) {
             if (g) {
-                for (j = l; j<n; j++) // Double division to avoid possible underflow
+                for (j = l; j < n; j++) // Double division to avoid possible underflow
                     v[j][i] = (a[i][j]/a[i][l])/g; 
 
-                for (j = l; j<n; j++) {
-                    for (s = 0.0, k = l; k<n; k++) 
+                for (j = l; j < n; j++) {
+                    for (s = 0.0, k = l; k < n; k++) 
                         s +=  a[i][k]*v[k][j]; 
-                    for (k = l; k<n; k++) 
+                    for (k = l; k < n; k++) 
                         v[k][j] +=  s*v[k][i]; 
                 }
             }
-            for (j = l; j<n; j++) v[i][j] = v[j][i] = 0.0; 
+            for (j = l; j < n; j++) v[i][j] = v[j][i] = 0.0; 
         }
         v[i][i] = 1.0; 
         g = rv1[i]; 
@@ -184,29 +176,29 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
     for (i = min(m, n)-1; i>= 0; i--) {
         l = i+1; 
         g = w[i]; 
-        for (j = l; j<n; j++) 
+        for (j = l; j < n; j++) 
             a[i][j] = 0.0; 
         if (g) {
             g = 1.0/g; 
-            for (j = l; j<n; j++) {
-                for (s = 0.0, k = l; k<m; k++) 
+            for (j = l; j < n; j++) {
+                for (s = 0.0, k = l; k < m; k++) 
                     s +=  a[k][i]*a[k][j]; 
 
                 f = (s/a[i][i])*g; 
-                for (k = i; k<m; k++) 
+                for (k = i; k < m; k++) 
                     a[k][j] +=  f*a[k][i]; 
             }
-        for (j = i; j<m; j++) 
+        for (j = i; j < m; j++) 
             a[j][i] *=  g; 
         } else 
-            for (j = i; j<m; j++) 
+            for (j = i; j < m; j++) 
                 a[j][i] = 0.0; 
         ++a[i][i]; 
     } // end for over i
 
     // Diagonalization of the bidiagonal form: Loop over singular values,  and over allowed iterations
     for (k = n-1; k>= 0; k--) {
-        for (its = 0; its<= Max_its; its++) {
+        for (its = 0; its <= Max_its; its++) {
             flag = 1; 
             for (l = k; l>= 0; l--) { // Test for splitting
                 nm = l-1;  // Note that rv1[0] is always zero
@@ -220,7 +212,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
             if (flag) {
                 c = 0.0;  // Cancellation of rv1[1],  if l>1
                 s = 1.0; 
-                for (i = l; i<= k; i++) {
+                for (i = l; i <= k; i++) {
                     f = s*rv1[i]; 
                     rv1[i] = c*rv1[i]; 
                     if ((double)(fabs(f)+anorm)  ==  anorm) 
@@ -232,7 +224,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
                     h = 1.0/h; 
                     c = g*h; 
                     s = -f*h; 
-                    for (j = 0; j<m; j++)
+                    for (j = 0; j < m; j++)
                      {
                         y = a[j][nm]; 
                         z = a[j][i]; 
@@ -243,9 +235,9 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
             }
             z = w[k]; 
             if (l  ==  k) { // Convergence
-                if (z<0.0) { // Singular value is made nonnegative
+                if (z < 0.0) { // Singular value is made nonnegative
                     w[k] = -z; 
-                    for (j = 0; j<n; j++) v[j][k] =  -v[j][k]; 
+                    for (j = 0; j < n; j++) v[j][k] =  -v[j][k]; 
                 }
                 break; 
             }
@@ -260,7 +252,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
             g = pythag(f, 1.0);  
             f = ((x-z)*(x+z)+h*((y/(f+SIGN(g, f)))-h))/x; 
             c = s = 1.0;  // Next QR transformation
-            for (j = l; j<= nm; j++) {
+            for (j = l; j <= nm; j++) {
                 i = j+1; 
                 g = rv1[i]; 
                 y = w[i]; 
@@ -274,7 +266,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
                 g = g*c-x*s; 
                 h = y*s; 
                 y *=  c; 
-                for (jj = 0; jj<n; jj++) {
+                for (jj = 0; jj < n; jj++) {
                     x = v[jj][j]; 
                     z = v[jj][i]; 
                     v[jj][j] = x*c+z*s; 
@@ -289,7 +281,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
                 }
                 f = c*g+s*y; 
                 x = c*y-s*g; 
-                for (jj = 0; jj<m; jj++) {
+                for (jj = 0; jj < m; jj++) {
                     y = a[jj][j]; 
                     z = a[jj][i]; 
                     a[jj][j] = y*c+z*s; 
@@ -305,16 +297,16 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
     free(rv1); 
 
     // on output a should be u. But for square matrix u and v are the same. so re-assign a as v.
-    for (j = 0; j<m; j++) {
-        for (i = 0; i<m; i++)
+    for (j = 0; j < m; j++) {
+        for (i = 0; i < m; i++)
             a[i][j] = v[i][j]; 
     }
     
     // zero out small singular values
     double wmin, wmax = 0.0;  
-    for (j = 0; j<n; j++) if (w[j] > wmax) wmax = w[j]; 
+    for (j = 0; j < n; j++) if (w[j] > wmax) wmax = w[j]; 
         wmin = n*wmax*(2.22044605e-16);  
-    for (j = 0; j<n; j++) if (w[j] < wmin) w[j] = 0.0; 
+    for (j = 0; j < n; j++) if (w[j] < wmin) w[j] = 0.0; 
 
 }
 
