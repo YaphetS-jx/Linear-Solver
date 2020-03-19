@@ -1,46 +1,19 @@
 #include "AAR.h"
-#include "system.h"
 
-///////////////////////////////////////////////////////////////////////////////
-////////////////////////////////// AAR solver /////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
 void AAR(DS_AAR* pAAR,
         void (*PoissonResidual)(DS_AAR*, double*, double*, int, int, MPI_Comm),
         double *x, double *rhs, double omega, double beta, int m, int p, 
-        int max_iter, double tol, int FDn, int np_x, int np_y, int np_z, MPI_Comm comm_dist_graph_cart) {
-    int rank; 
+        int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart) 
+{
+    int rank, i, j, k, col, iter; 
+    double *res, *x_old, *f_old, **DX, **DF, *am_vec, t0, t1;
+    double *FtF, *allredvec, *Ftf, *svec, relres, rhs_norm;  
+    //////////////////////////////////////////////////////////
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
-    int i, j, k, col; 
-    double *res, *x_old, *f_old, **DX, **DF, *am_vec, t_poiss0, t_poiss1;  
-
     // allocate memory to store x(x) in domain
-    // x_new = (double***)calloc((np_z+2*FDn), sizeof(double**)); 
-    // x_old = (double***)calloc((np_z+2*FDn), sizeof(double**)); 
-    // x_res = (double***)calloc((np_z+2*FDn), sizeof(double**)); 
-    // x_temp = (double***)calloc((np_z+2*FDn), sizeof(double**));   
-    // assert(x_new !=  NULL && x_old !=  NULL && x_res !=  NULL && x_temp !=  NULL); 
-
-    // for (k = 0; k<np_z+2*FDn; k++) {
-    //     x_new[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
-    //     x_old[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
-    //     x_res[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
-    //     x_temp[k] = (double**)calloc((np_y+2*FDn), sizeof(double*)); 
-    //     assert(x_new[k] !=  NULL && x_old[k] !=  NULL && x_res[k] !=  NULL && x_temp[k] !=  NULL); 
-
-    //     for (j = 0; j<np_y+2*FDn; j++) {
-    //         x_new[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
-    //         x_old[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
-    //         x_res[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
-    //         x_temp[k][j] = (double*)calloc((np_x+2*FDn), sizeof(double)); 
-    //         assert(x_new[k][j] !=  NULL && x_old[k][j] !=  NULL && x_res[k][j] !=  NULL && x_temp[k][j] !=  NULL); 
-    //     }
-    // }
-
-    // allocate memory to store x(x) in domain
-    int Np = np_z * np_y * np_x;
     res = (double*)calloc(Np, sizeof(double));  
-    // x_old = (double*)calloc(Np, sizeof(double)); 
     x_old = (double*)calloc(Np, sizeof(double));  
     f_old = (double*)calloc(Np, sizeof(double));  
     am_vec = (double*)calloc(Np, sizeof(double));  
@@ -57,41 +30,28 @@ void AAR(DS_AAR* pAAR,
         assert(DX[k] !=  NULL && DF[k] !=  NULL); 
     }
 
-    double *FtF, *allredvec, *Ftf, *svec;                           
     FtF = (double*) calloc(m*m, sizeof(double));                       // DF'*DF matrix in column major format
     allredvec = (double*) calloc(m*m+m, sizeof(double));               
     Ftf = (double*) calloc(m, sizeof(double));                             // DF'*res vector of size m x 1
     svec = (double*) calloc(m, sizeof(double));                            // vector to store singular values    
-    int iter = 1; 
-    double relres = tol+1; 
+    
 
-    // Initialize x_old from initial_guess
-    // AXPYMvPs_3d(x_old, x, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn); 
-    // AXPYMvPs_3d(x_temp, x_old, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn); 
-
+    iter = 1; 
+    relres = tol+1; 
     // calculate norm of right hand side (required for relative residual)
-    double rhs_norm = 1.0;
     Vector2Norm(rhs, Np, &rhs_norm); 
     tol *= rhs_norm;
+    PoissonResidual(pAAR, x, res, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
 
-    PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
-
+#ifdef DEBUG
     Vector2Norm(res, Np, &relres);
-    if(!rank) printf("reslres: %g\n", relres);
+    if(!rank) printf("preconditioned reslres: %g\n", relres/rhs_norm);
+#endif
 
-    Vector2Norm(x, Np, &relres);
-    if(!rank && iter < 15) printf("phi: %g\n", relres);
-
-    t_poiss0 = MPI_Wtime(); 
+    t0 = MPI_Wtime(); 
     
     // begin while loop
     while (relres > tol && iter <=  max_iter) {
-        // PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
-
-        // -------------- Update x --------------- //
-        // convert_to_vector(x_res, res, np_x, np_y, np_z, FDn);
-        // convert_to_vector(x_old, x_old, np_x, np_y, np_z, FDn);
-
         //----------Store Residual & Iterate History----------//
         if(iter>1) {
             col = ((iter-2) % m); 
@@ -99,12 +59,7 @@ void AAR(DS_AAR* pAAR,
                 DX[col][i] = x[i] - x_old[i];
                 DF[col][i] = res[i] - f_old[i];
             }
-            // AXPY(DX[col], x_old, Xold, -1.0, np_x, np_y, np_z); // DX = delta x
-            // AXPY(DF[col], res, Fold, -1.0, np_x, np_y, np_z); // DF = delta res
         } 
-
-        // AXPY(Xold, x_old, NULL, 0, np_x, np_y, np_z);   // Xold = x_old;
-        // AXPY(Fold, res, NULL, 0, np_x, np_y, np_z);   // Fold = x_res;
 
         for (i = 0; i < Np; i++){
             x_old[i] = x[i];
@@ -113,92 +68,50 @@ void AAR(DS_AAR* pAAR,
 
         //----------Anderson update-----------//
         if(iter % p == 0 && iter>1) {
-            // vec_dot_product(&relres, res, res, np_x, np_y, np_z);
+            // x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*res));
 
-            // allredvec[m * m + m] = relres; 
+            AndersonExtrapolation(DX, DF, res, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec, x, x_old); 
 
-            AndersonExtrapolation(DX, DF, res, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec); 
-
-            for (i = 0; i < Np; i ++){
-                x[i] = x_old[i] + beta * res[i] - am_vec[i];
-            }
-            // relres = sqrt(allredvec[m * m + m])/rhs_norm;                  // relative residual    
-
-            PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
+            PoissonResidual(pAAR, x, res, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
 
             Vector2Norm(res, Np, &relres);
-            if(!rank && iter < 15) printf("reslres: %g\n", relres);
 
-            // AXPYMvPs_3d(x_new, x_old, x_res, am_vec, beta, 0, np_x, np_y, np_z, FDn);
+#ifdef DEBUG
+    if(rank == 0) printf("preconditioned reslres: %g\n", relres/rhs_norm);
+#endif
 
         } else {
             //----------Richardson update-----------//
-            // AXPYMvPs_3d(x_new, x_old, x_res, NULL, omega, 0, np_x, np_y, np_z, FDn);    // x_k+1 = x_k + omega*f_k
+            // x = x + omega * res
 
             for (i = 0; i < Np; i++){
                 x[i] = x_old[i] + omega * res[i];
             }
 
-            PoissonResidual(pAAR, x, res, np_x, FDn, comm_dist_graph_cart); 
-            Vector2Norm(res, Np, &relres);
-            if(!rank && iter < 15) printf("reslres: %g\n", relres);
+            PoissonResidual(pAAR, x, res, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
 
-            Vector2Norm(x, Np, &relres);
-            if(!rank && iter < 15) printf("phi: %g\n", relres);
+#ifdef DEBUG
+    Vector2Norm(res, Np, &relres);
+    if(rank == 0) printf("preconditioned relres: %g\n", relres/rhs_norm);
+#endif
         }
-
-        // if(res<= tol || iter  ==  max_iter) {
-        //     AXPYMvPs_3d(x, x_old, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn);             // store the solution of Poisson's equation
-        // }
-
-        // AXPYMvPs_3d(x_old, x_new, NULL, NULL, 0, 0, np_x, np_y, np_z, FDn);                   // set x_old = x_new
-
-        // AXPYMvPs_3d(x_temp, x_old, NULL, NULL, 0, 0, np_x+2*FDn, np_y+2*FDn, np_z+2*FDn, 0);  // update x_temp
 
         iter = iter+1; 
     } // end while loop
 
-    t_poiss1 = MPI_Wtime(); 
+    t1 = MPI_Wtime(); 
     if(rank  ==  0) {
-        if(iter<max_iter && relres<= tol) {
+        if(iter < max_iter && relres <= tol) {
             printf("AAR preconditioned with Jacobi (AAJ).\n");  
-            printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relres, t_poiss1-t_poiss0); 
+            printf("AAR converged!:  Iterations = %d, preconditioned Relative Residual = %g, Time = %.4f sec\n", iter-1, relres/rhs_norm, t1-t0); 
         }
         if(iter>= max_iter) {
             printf("WARNING: AAR exceeded maximum iterations.\n"); 
-            printf("AAR:  Iterations = %d, Residual = %g, Time = %.4f sec \n", iter-1, relres, t_poiss1-t_poiss0); 
+            printf("AAR:  Iterations = %d, preconditioned Relative Residual = %g, Time = %.4f sec \n", iter-1, relres/rhs_norm, t1-t0); 
         }
     }
 
-    // shift x since it can differ by a constant
-    double x_fix = 0.0; 
-    double x000 = x[FDn + FDn*np_y + FDn*np_y*np_z]; 
-    MPI_Bcast(&x000, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
-    // AXPYMvPs_3d(x, x, NULL, NULL, 0, x_fix - x000, np_x, np_y, np_z, FDn);
-    for (i = 0; i < Np; i++){
-        x[i] = x[i] + x_fix - x000;
-    }
-
-    // de-allocate memory
-    // for (k = 0; k<np_z+2*FDn; k++) {
-    //     for (j = 0; j<np_y+2*FDn; j++) {
-    //       free(x_new[k][j]); 
-    //       free(x_old[k][j]); 
-    //       free(x_res[k][j]); 
-    //       free(x_temp[k][j]); 
-    //     }
-    //     free(x_new[k]); 
-    //     free(x_old[k]); 
-    //     free(x_res[k]); 
-    //     free(x_temp[k]); 
-    // }
-    // free(x_new); 
-    // free(x_old); 
-    // free(x_res); 
-    // free(x_temp); 
-
     free(res); 
-    // free(x_old); 
     free(x_old); 
     free(f_old); 
     free(am_vec); 
@@ -216,77 +129,71 @@ void AAR(DS_AAR* pAAR,
     free(allredvec); 
 }
 
-// void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis){
-//     int i, j, k, ctr = 0;
-//     for (k = 0; k < np_z; k++) 
-//         for (j = 0; j < np_y; j++) 
-//             for (i = 0; i < np_x; i++)             
-//                 vector[ctr++] = vector_3d[k+dis][j+dis][i+dis]; 
-// }
+void AndersonExtrapolation(double **DX,  double **DF,  double *res,  double beta,  int m,  int Np,  double *am_vec,  
+                            double *FtF,  double *allredvec,  double *Ftf,  double *svec, double *x, double *x_old) {
+    // DX and DF are iterate and residual history matrices of size Npxm where Np = no. of nodes in proc domain and m = m
+    // am_vec is the final update vector of size Npx1
+    // res is the residual vector at current iteration of fixed point method
 
-// z = x + alpha * y
-void AXPY(double *z, double *x, double *y, double alpha, int np_x, int np_y, int np_z){
-    int i, j, k, ctr = 0;
-    if (y != NULL && alpha == -1.0) {
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                        z[ctr++] = x[ctr] - y[ctr]; 
+    int i, j, k, ctr, cnt; 
+    
+    // ------------------- First find DF'*DF m x m matrix (local and then AllReduce) ------------------- //
+    double temp_sum = 0; 
+
+    for (j = 0; j < m; j++) {
+        for (i = 0; i <= j; i++) {
+            temp_sum = 0; 
+            for (k = 0; k < Np; k++) {
+                temp_sum = temp_sum + DF[i][k]*DF[j][k]; 
+            }
+            ctr = j*m+i; 
+            allredvec[ctr] = temp_sum; 
+            ctr = i*m+j; 
+            allredvec[ctr] = temp_sum; 
+        }
     }
 
-    if (y != NULL && alpha != -1.0) {
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                        z[ctr++] = x[ctr] + alpha * y[ctr]; 
+    ctr = m*m; 
+    // ------------------- Compute DF'*res ------------------- //
+
+    for (j = 0; j < m; j++) {
+        temp_sum = 0; 
+        for (k = 0; k < Np; k++) {
+            temp_sum = temp_sum + DF[j][k]*res[k]; 
+        }
+        allredvec[ctr] = temp_sum; 
+        ctr = ctr + 1; 
     }
 
-    if (y == NULL) {
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                        z[ctr++] = x[ctr];
+    MPI_Allreduce(MPI_IN_PLACE,  allredvec,  m*m+m,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
+
+    ctr = 0; 
+    for (j = 0; j < m; j++) {
+        for (i = 0; i<m; i++) {
+            FtF[ctr] = allredvec[ctr];  // (FtF)_ij element
+            ctr = ctr + 1; 
+        }
     }
-}
-
-void vec_dot_product(double *s, double *x, double *y, int np_x, int np_y, int np_z){
-    int i, j, k, ctr = 0;
-    *s = 0;
-    for (k = 0; k < np_z; k++) 
-        for (j = 0; j < np_y; j++) 
-            for (i = 0; i < np_x; i++) 
-                *s += x[ctr] * y[ctr++]; 
-}
-
-// z = x + alpha * y - v + s 
-void AXPYMvPs_3d(double ***z, double ***x, double ***y, double *v, double alpha, double s, int np_x, int np_y, int np_z, int dis){
-    int i, j, k, ctr = 0;
-    if (v == NULL && y != NULL && s ==0){
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis] + alpha * y[k+dis][j+dis][i+dis];
+    cnt = 0; 
+    for (j = 0; j < m; j++) {
+          Ftf[cnt] = allredvec[ctr];  // (Ftf)_j element
+          ctr = ctr + 1; 
+          cnt = cnt+1; 
     }
 
-    if (v == NULL && y == NULL && s ==0){
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis];
+    PseudoInverseTimesVec(FtF, Ftf, svec, m);  // svec = Y      
+
+    // ------------------- Compute Anderson update vector am_vec ------------------- //
+    for (k = 0; k < Np; k++) {
+        temp_sum = 0; 
+        for (j = 0; j < m; j++) {
+            temp_sum = temp_sum + (DX[j][k] + beta*DF[j][k])*svec[j]; 
+        }
+        am_vec[k] = temp_sum;  // (am_vec)_k element
     }
 
-    if (v != NULL && y != NULL && s ==0){
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis] + alpha * y[k+dis][j+dis][i+dis] - v[ctr++];
-    }
-
-    if (v == NULL && y == NULL && s !=0) {
-        for (k = 0; k < np_z; k++) 
-            for (j = 0; j < np_y; j++) 
-                for (i = 0; i < np_x; i++) 
-                    z[k + dis][j+dis][i+dis] = x[k+dis][j+dis][i+dis] + s;
+    for (i = 0; i < Np; i ++){
+        x[i] = x_old[i] + beta * res[i] - am_vec[i];
     }
 }
 

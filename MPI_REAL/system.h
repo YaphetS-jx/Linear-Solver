@@ -1,3 +1,15 @@
+/**
+ * @file    system.h
+ * @brief   This file declares the functions for the linear system, residual 
+ *          function and precondition function.
+ *
+ * @author  Xin Jing <xjing30@gatech.edu>
+ *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
+ * 
+ * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
+ */
+
+
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
@@ -9,9 +21,7 @@
 #include <mpi.h>
 #include <assert.h>
 
-#define SIGN(a,b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
 #define M_PI 3.14159265358979323846
-#define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 typedef struct {
@@ -50,15 +60,10 @@ void Initialize(DS_AAR* pAAR);
 void Read_input(DS_AAR* pAAR); 
 void Processor_domain(DS_AAR* pAAR);
 void Comm_topologies(DS_AAR* pAAR);
-void Vector2Norm(double* Vec, int len, double* ResVal); 
 void Laplacian_Comm_Indices(DS_AAR* pAAR); 
 void EdgeIndicesForPoisson(DS_AAR* pAAR, int **eout_s,int **eout_e, int **ein_s,int **ein_e, int ereg_s[3][26],int ereg_e[3][26],int **stencil_sign,int **edge_ind,int *displs_send,int *displs_recv,int *ncounts_send,int *ncounts_recv);
-void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart);
-double pythag(double a, double b); 
-void SingularValueDecomp(double **a,int m,int n, double *w, double **v);
-void PseudoInverseTimesVec(double *Ac,double *b,double *x,int m); 
-void AndersonExtrapolation(double **DX, double **DF, double *phi_res_vec, double beta_mix, int anderson_history, int N, double *am_vec, double *FtF, double *allredvec, double *Ftf, double *svec); 
 void Deallocate_memory(DS_AAR* pAAR); 
+void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart);
 void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
 void convert_to_vector3d(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
 

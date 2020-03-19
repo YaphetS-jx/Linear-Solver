@@ -1,13 +1,17 @@
-/*  ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==    ==   = 
-  | Alternating Anderson Richardson (AAR) code
-  | Copyright (C) 2018 Material Physics & Mechanics Group at Georgia Tech.
-  | 
-  | Authors: Phanisri Pradeep Pratapa,  Phanish Suryanarayana
-  |
-  | Last Modified: 27 Mar 2018   
-  |-------------------------------------------------------------------------------------------*/
+/**
+ * @file    system.c
+ * @brief   This file contains functions for linear system, residual 
+ *          function and precondition function.
+ *
+ * @author  Xin Jing <xjing30@gatech.edu>
+ *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
+ * 
+ * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
+ */
+
 
 #include "system.h"
+#include "tools.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -132,7 +136,7 @@ void Initialize(DS_AAR* pAAR) {
     for (k = 0; k<pAAR->np_z; k++) {
         for (j = 0; j<pAAR->np_z; j++) {
             for (i = 0; i<pAAR->np_z; i++) {
-                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = (2*((double)(rand()) / (double)(RAND_MAX))-1); 
+                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = 1/*(2*((double)(rand()) / (double)(RAND_MAX))-1)*/; 
             }
         }
     }
@@ -294,12 +298,7 @@ void Comm_topologies(DS_AAR* pAAR) {
     free(neighs); 
 }
 
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-// Solver related functions
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
+// compute preconditioned relative residual
 
 void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart) {
     int rank; 
@@ -451,385 +450,6 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
     free(phi_edge_out);  //de-allocate memory
 }
 
-
-
-// function to compute 2-norm of a vector
-void Vector2Norm(double* Vec,  int len,  double* ResVal) { // Vec is the pointer to the vector,  len is the length of the vector Vec,  and ResVal is the pointer to the residual value
-    int rank,  k; 
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-
-    double res = 0; 
-    for (k = 0; k<len; k++)
-        res = res + Vec[k]*Vec[k]; 
-
-    double res_global; 
-    MPI_Allreduce(&res,  &res_global,  1,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
-
-    res_global = sqrt(res_global); 
-
-    *ResVal = res_global; 
-}
-
-// function to compute Anderson update vector
-void AndersonExtrapolation(double **DX,  double **DF,  double *phi_res_vec,  double beta_mix,  int anderson_history,  int N,  double *am_vec,  
-                            double *FtF,  double *allredvec,  double *Ftf,  double *svec) {
-    // DX and DF are iterate and residual history matrices of size Nxm where N = no. of nodes in proc domain and m = anderson_history
-    // am_vec is the final update vector of size Nx1
-    // phi_res_vec is the residual vector at current iteration of fixed point method
-
-    int i, j, k, ctr, cnt; 
-    int m = anderson_history; 
-    
-    // ------------------- First find DF'*DF m x m matrix (local and then AllReduce) ------------------- //
-    double temp_sum = 0; 
-
-    for (j = 0; j<m; j++) {
-        for (i = 0; i<= j; i++) {
-            temp_sum = 0; 
-            for (k = 0; k<N; k++) {
-                temp_sum = temp_sum + DF[i][k]*DF[j][k]; 
-            }
-            ctr = j*m+i; 
-            allredvec[ctr] = temp_sum; 
-            ctr = i*m+j; 
-            allredvec[ctr] = temp_sum; 
-        }
-    }
-
-    ctr = m*m; 
-    // ------------------- Compute DF'*phi_res_vec ------------------- //
-
-    for (j = 0; j<m; j++) {
-        temp_sum = 0; 
-        for (k = 0; k<N; k++) {
-            temp_sum = temp_sum + DF[j][k]*phi_res_vec[k]; 
-        }
-        allredvec[ctr] = temp_sum; 
-        ctr = ctr + 1; 
-    }
-
-    MPI_Allreduce(MPI_IN_PLACE,  allredvec,  m*m+m,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
-
-    ctr = 0; 
-    for (j = 0; j<m; j++) {
-        for (i = 0; i<m; i++) {
-            FtF[ctr] = allredvec[ctr];  // (FtF)_ij element
-            ctr = ctr + 1; 
-        }
-    }
-    cnt = 0; 
-    for (j = 0; j<m; j++) {
-          Ftf[cnt] = allredvec[ctr];  // (Ftf)_j element
-          ctr = ctr + 1; 
-          cnt = cnt+1; 
-    }
-
-    PseudoInverseTimesVec(FtF, Ftf, svec, m);  // svec = Y      
-
-    // ------------------- Compute Anderson update vector am_vec ------------------- //
-    for (k = 0; k<N; k++) {
-        temp_sum = 0; 
-        for (j = 0; j<m; j++) {
-            temp_sum = temp_sum + (DX[j][k] + beta_mix*DF[j][k])*svec[j]; 
-        }
-        am_vec[k] = temp_sum;  // (am_vec)_k element
-    }
-
-}
-
-
-void PseudoInverseTimesVec(double *Ac, double *b, double *x, int m) { // returns x = pinv(A)*b,  matrix A is m x m  but given in column major format Ac (so m^2 x 1) and vector b is m x 1
-
-    int i, j, k, ctr, jj; 
-    double **A, **U, **V, *w;  // A matrix in column major format as Ac. w is the array of singular values
-    A = (double**) calloc(m,  sizeof(double*));  // need to de-allocate later
-    U = (double**) calloc(m,  sizeof(double*));   // need to de-allocate later
-    V = (double**) calloc(m,  sizeof(double*)); 
-    for (k = 0; k<m; k++)
-    {
-      A[k] = (double*) calloc(m,  sizeof(double));  // need to de-allocate later
-      U[k] = (double*) calloc(m,  sizeof(double));   // need to de-allocate later
-      V[k] = (double*) calloc(m,  sizeof(double));   // need to de-allocate later
-    }
-    w = (double*) calloc(m,  sizeof(double));   // need to de-allocate later
-
-    // convert column major to matrix form
-    ctr = 0; 
-    for (j = 0; j<m; j++) { // column index
-        for (i = 0; i<m; i++) { // row index
-            A[i][j] = Ac[ctr];  // (A)_ij element
-            U[i][j] = A[i][j]; 
-            ctr = ctr + 1; 
-        }
-    }
-
-    // Perform SVD on matrix A = UWV'.
-    SingularValueDecomp(U, m, m, w, V);  // While input,  U = A,  and while output U = U. Need to give output singular values which have been zeroed out if they are small
-
-    // Find Pseudoinverse times vector (pinv(A)*b = (V*diag(1/wj)*U')*b)
-    double s, *tmp; 
-    tmp = (double*) calloc(m,  sizeof(double));  // need to de-allocate later
-    for (j = 0; j<m; j++) { // calculate U'*b
-        s = 0.0; 
-        if (w[j]) { // nonzero result only if wj is nonzero
-            for (i = 0; i<m; i++) s +=  U[i][j]*b[i]; 
-            s /=  w[j];  // This is the divide by wj
-        }
-        tmp[j] = s; 
-    }
-    for (j = 0; j<m; j++) { // Matrix multiply by V to get answer
-        s = 0.0; 
-        for (jj = 0; jj<m; jj++) s +=  V[j][jj]*tmp[jj]; 
-            x[j] = s; 
-    }
-
-    for (k = 0; k<m; k++) {
-        free(A[k]); 
-        free(U[k]); 
-        free(V[k]); 
-    }
-
-    free(A); 
-    free(U); 
-    free(V); 
-    free(w); 
-    free(tmp); 
-}
-
-// a is matrix (array) size m x n,  A = UWV'. U replaces "a" on output. w is an array of singular values,  size 1 x n. V is output as matrix v of size n x n. 
-void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) { 
-    int flag, i, its, j, jj, k, l, nm, Max_its = 250; 
-    double anorm, c, f, g, h, s, scale, x, y, z, *rv1; 
-
-    rv1 = (double*) calloc(n,  sizeof(double));   // need to de-allocate later
-    g = scale = anorm = 0.0; 
-    // Householder reduction to bidiagonal form
-    for (i = 0; i<n; i++) {
-        l = i+1; 
-        rv1[i] = scale*g; 
-        g = s = scale = 0.0; 
-        if (i<m) {
-            for (k = i; k<m; k++) 
-                scale +=  fabs(a[k][i]); 
-            if (scale) {
-                for (k = i; k<m; k++) {
-                    a[k][i] /=  scale; 
-                    s +=  a[k][i]*a[k][i]; 
-                }
-                f = a[i][i]; 
-                g = -SIGN(sqrt(s), f); 
-                h = f*g-s; 
-                a[i][i] = f-g; 
-                for (j = 1;  j < n;  j++){
-                    for (s = 0.0, k = i; k<m; k++) 
-                        s +=  a[k][i]*a[k][j]; 
-                    f = s/h; 
-                    for (k = i; k<m; k++) 
-                        a[k][j] +=  f*a[k][i]; 
-                }
-                for (k = i; k<m; k++) 
-                    a[k][i] *=  scale; 
-            }
-        }
-
-        w[i] = scale *g; 
-        g = s = scale = 0.0; 
-        if (i<= m-1 && i!= n-1) {
-            for (k = l; k<n; k++) 
-                scale +=  fabs(a[i][k]); 
-            if (scale) {
-                for (k = l; k<n; k++)
-                 {
-                    a[i][k] /=  scale; 
-                    s +=  a[i][k]*a[i][k]; 
-                }
-                f = a[i][l]; 
-                g = -SIGN(sqrt(s), f); 
-                h = f*g-s; 
-                a[i][l] = f-g; 
-                for (k = l; k<n; k++) 
-                    rv1[k] = a[i][k]/h; 
-                for (j = l; j<m; j++) {
-                    for (s = 0.0, k = l; k<n; k++) 
-                        s +=  a[j][k]*a[i][k]; 
-                    for (k = l; k<n; k++) 
-                        a[j][k] +=  s*rv1[k]; 
-                }
-                for (k = l; k<n; k++) a[i][k] *=  scale; 
-            }
-        }
-
-        anorm = max(anorm, (fabs(w[i])+fabs(rv1[i]))); 
-
-    } // end for loop over i
-
-    // Accumulation of right-hand transformations
-    for (i = n-1; i>= 0; i--) {
-        if (i<n-1) {
-            if (g) {
-                for (j = l; j<n; j++) // Double division to avoid possible underflow
-                    v[j][i] = (a[i][j]/a[i][l])/g; 
-
-                for (j = l; j<n; j++) {
-                    for (s = 0.0, k = l; k<n; k++) 
-                        s +=  a[i][k]*v[k][j]; 
-                    for (k = l; k<n; k++) 
-                        v[k][j] +=  s*v[k][i]; 
-                }
-            }
-            for (j = l; j<n; j++) v[i][j] = v[j][i] = 0.0; 
-        }
-        v[i][i] = 1.0; 
-        g = rv1[i]; 
-        l = i; 
-    } // end for loop over i
-
-    // Accumulation of left-hand transformations
-    for (i = min(m, n)-1; i>= 0; i--) {
-        l = i+1; 
-        g = w[i]; 
-        for (j = l; j<n; j++) 
-            a[i][j] = 0.0; 
-        if (g) {
-            g = 1.0/g; 
-            for (j = l; j<n; j++) {
-                for (s = 0.0, k = l; k<m; k++) 
-                    s +=  a[k][i]*a[k][j]; 
-
-                f = (s/a[i][i])*g; 
-                for (k = i; k<m; k++) 
-                    a[k][j] +=  f*a[k][i]; 
-            }
-        for (j = i; j<m; j++) 
-            a[j][i] *=  g; 
-        } else 
-            for (j = i; j<m; j++) 
-                a[j][i] = 0.0; 
-        ++a[i][i]; 
-    } // end for over i
-
-    // Diagonalization of the bidiagonal form: Loop over singular values,  and over allowed iterations
-    for (k = n-1; k>= 0; k--) {
-        for (its = 0; its<= Max_its; its++) {
-            flag = 1; 
-            for (l = k; l>= 0; l--) { // Test for splitting
-                nm = l-1;  // Note that rv1[0] is always zero
-                if ((double)(fabs(rv1[l])+anorm)   ==   anorm) {
-                    flag = 0; 
-                    break; 
-                }
-                if ((double)(fabs(w[nm])+anorm)   ==   anorm) 
-                    break; 
-            } // end for over l
-            if (flag) {
-                c = 0.0;  // Cancellation of rv1[1],  if l>1
-                s = 1.0; 
-                for (i = l; i<= k; i++) {
-                    f = s*rv1[i]; 
-                    rv1[i] = c*rv1[i]; 
-                    if ((double)(fabs(f)+anorm)  ==  anorm) 
-                        break; 
-
-                    g = w[i]; 
-                    h = pythag(f, g); 
-                    w[i] = h; 
-                    h = 1.0/h; 
-                    c = g*h; 
-                    s = -f*h; 
-                    for (j = 0; j<m; j++)
-                     {
-                        y = a[j][nm]; 
-                        z = a[j][i]; 
-                        a[j][nm] = y*c+z*s; 
-                        a[j][i] = z*c-y*s; 
-                    }
-                }
-            }
-            z = w[k]; 
-            if (l  ==  k) { // Convergence
-                if (z<0.0) { // Singular value is made nonnegative
-                    w[k] = -z; 
-                    for (j = 0; j<n; j++) v[j][k] =  -v[j][k]; 
-                }
-                break; 
-            }
-            if (its  ==  Max_its){ printf("no convergence in %d svd iterations \n", Max_its); exit(1); }
-
-            x = w[l];  // Shift from bottom 2-by-2 minor
-            nm = k-1; 
-            y = w[nm]; 
-            g = rv1[nm]; 
-            h = rv1[k]; 
-            f = ((y-z)*(y+z)+(g-h)*(g+h))/(2.0*h*y); 
-            g = pythag(f, 1.0);  
-            f = ((x-z)*(x+z)+h*((y/(f+SIGN(g, f)))-h))/x; 
-            c = s = 1.0;  // Next QR transformation
-            for (j = l; j<= nm; j++) {
-                i = j+1; 
-                g = rv1[i]; 
-                y = w[i]; 
-                h = s*g; 
-                g = c*g; 
-                z = pythag(f, h); 
-                rv1[j] = z; 
-                c = f/z; 
-                s = h/z; 
-                f = x*c+g*s; 
-                g = g*c-x*s; 
-                h = y*s; 
-                y *=  c; 
-                for (jj = 0; jj<n; jj++) {
-                    x = v[jj][j]; 
-                    z = v[jj][i]; 
-                    v[jj][j] = x*c+z*s; 
-                    v[jj][i] = z*c-x*s; 
-                }
-                z = pythag(f, h); 
-                w[j] = z;  // Rotation can be arbitrary if z = 0
-                if (z) {
-                    z = 1.0/z; 
-                    c = f*z; 
-                    s = h*z; 
-                }
-                f = c*g+s*y; 
-                x = c*y-s*g; 
-                for (jj = 0; jj<m; jj++) {
-                    y = a[jj][j]; 
-                    z = a[jj][i]; 
-                    a[jj][j] = y*c+z*s; 
-                    a[jj][i] = z*c-y*s; 
-                }
-            }
-            rv1[l] = 0.0; 
-            rv1[k] = f; 
-            w[k] = x; 
-        } // end for over its
-    } //end for over k
-
-    free(rv1); 
-
-    // on output a should be u. But for square matrix u and v are the same. so re-assign a as v.
-    for (j = 0; j<m; j++) {
-        for (i = 0; i<m; i++)
-            a[i][j] = v[i][j]; 
-    }
-    
-    // zero out small singular values
-    double wmin, wmax = 0.0;  
-    for (j = 0; j<n; j++) if (w[j] > wmax) wmax = w[j]; 
-        wmin = n*wmax*(2.22044605e-16);  
-    for (j = 0; j<n; j++) if (w[j] < wmin) w[j] = 0.0; 
-
-}
-
-// computes (a^2 + b^2)^0.5
-double pythag(double a,  double b) {
-    double absa, absb; 
-    absa = fabs(a); 
-    absb = fabs(b); 
-    if (absa>absb) return absa*sqrt(1.0+(double)(absb*absb/(absa*absa))); 
-    else return (absb   ==   0.0 ? 0.0 : absb*sqrt(1.0+(double)(absa*absa/(absb*absb)))); 
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1207,6 +827,7 @@ void Deallocate_memory(DS_AAR* pAAR)  {
     free(pAAR->LapInd.ncounts_recv);   
 
 }
+
 
 void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis){
     int i, j, k, ctr = 0;
