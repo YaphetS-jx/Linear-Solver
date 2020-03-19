@@ -57,7 +57,7 @@ void AAR(DS_AAR* pAAR,
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relf);
-    if(!rank) printf("preconditioned flf: %g\n", relf/rhs_norm);
+    if(!rank) printf("preconditioned Relative Residual: %g\n", relf/rhs_norm);
 #endif
 
     t0 = MPI_Wtime(); 
@@ -89,7 +89,7 @@ void AAR(DS_AAR* pAAR,
             Vector2Norm(f, Np, &relf);
 
 #ifdef DEBUG
-    if(rank == 0) printf("preconditioned flf: %g\n", relf/rhs_norm);
+    if(rank == 0) printf("preconditioned Relative Residual: %g\n", relf/rhs_norm);
 #endif
 
         } else {
