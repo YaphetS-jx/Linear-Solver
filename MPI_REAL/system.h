@@ -45,25 +45,26 @@ typedef struct {
     double solver_tol;             /// <  Convergence tolerance for AAR solver
     int solver_maxiter;            /// <  Maximum number of iterations allowed in the AAR solver
     int *neighs_lap;               /// <  Array of neighboring processor ranks in the Laplacian stencil width from current processor
-    double omega_aar;              /// <  Richardson relaxation parameter
-    double beta_aar;               /// <  Anderson relaxation parameter
-    int m_aar;                     /// <  Number of iterates in Anderson mixing = m_aar+1
-    int p_aar;                     /// <  AAR parameter. Anderson update done every p_aar iteration of AAR solver
+    double omega;                  /// <  Richardson relaxation parameter
+    double beta;                   /// <  Anderson relaxation parameter
+    int m;                         /// <  Number of iterates in Anderson mixing = m+1
+    int p;                         /// <  AAR parameter. Anderson update done every p iteration of AAR solver
     int non_blocking;              /// <  Option that indicates using non-blocking version of MPI command. 1=TRUE or 0=FALSE (for MPI collectives)
     double ***phi;                 /// <  Unknown variable of the linear equation
     double *phi_v;                 /// <  Unknown variable of the linear equation
     MPI_Comm comm_laplacian;       /// <  Communicator topology for Laplacian
-}DS_AAR;
+}DS;
 
-void CheckInputs(DS_AAR* pAAR,int argc, char ** argv); 
-void Initialize(DS_AAR* pAAR); 
-void Read_input(DS_AAR* pAAR); 
-void Processor_domain(DS_AAR* pAAR);
-void Comm_topologies(DS_AAR* pAAR);
-void Laplacian_Comm_Indices(DS_AAR* pAAR); 
-void EdgeIndicesForPoisson(DS_AAR* pAAR, int **eout_s,int **eout_e, int **ein_s,int **ein_e, int ereg_s[3][26],int ereg_e[3][26],int **stencil_sign,int **edge_ind,int *displs_send,int *displs_recv,int *ncounts_send,int *ncounts_recv);
-void Deallocate_memory(DS_AAR* pAAR); 
-void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart);
+void CheckInputs(DS* pAAR,int argc, char ** argv); 
+void Initialize(DS* pAAR); 
+void Read_input(DS* pAAR); 
+void Processor_domain(DS* pAAR);
+void Comm_topologies(DS* pAAR);
+void Laplacian_Comm_Indices(DS* pAAR); 
+void EdgeIndicesForPoisson(DS* pAAR, int **eout_s,int **eout_e, int **ein_s,int **ein_e, int ereg_s[3][26],
+    int ereg_e[3][26],int **stencil_sign,int **edge_ind,int *displs_send,int *displs_recv,int *ncounts_send,int *ncounts_recv);
+void Deallocate_memory(DS* pAAR); 
+void PoissonResidual(DS *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart);
 void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
 void convert_to_vector3d(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
 

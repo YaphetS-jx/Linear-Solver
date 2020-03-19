@@ -19,7 +19,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-void CheckInputs(DS_AAR* pAAR,  int argc,  char ** argv)  {
+void CheckInputs(DS* pAAR, int argc, char ** argv)  {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     char temp; 
@@ -39,7 +39,7 @@ void CheckInputs(DS_AAR* pAAR,  int argc,  char ** argv)  {
     np_temp = pow(pAAR->nproc, 1.0/3.0); 
     if (abs(pow(round(np_temp), 3)-pAAR->nproc)>1e-14) {
         if (rank  ==  0)
-            printf("Assigned number of processors:%u,  is not a perfect cube. Exiting. \n", pAAR->nproc); 
+            printf("Assigned number of processors:%u, is not a perfect cube. Exiting. \n", pAAR->nproc); 
         MPI_Barrier(MPI_COMM_WORLD); 
         exit(0); 
     } else {
@@ -51,62 +51,62 @@ void CheckInputs(DS_AAR* pAAR,  int argc,  char ** argv)  {
         exit(-1); 
     } else {
         pAAR->solver_tol = atof(argv[1]); 
-        pAAR->m_aar = atof(argv[2]); 
-        pAAR->p_aar = atof(argv[3]); 
-        pAAR->omega_aar = atof(argv[4]); 
-        pAAR->beta_aar = atof(argv[5]); 
+        pAAR->m = atof(argv[2]); 
+        pAAR->p = atof(argv[3]); 
+        pAAR->omega = atof(argv[4]); 
+        pAAR->beta = atof(argv[5]); 
     }
 }
 
 
-void Initialize(DS_AAR* pAAR) {
+void Initialize(DS* pAAR) {
     int i, j, k;
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);   
 
-    /// Read from an input file,  store the data in data structure  and write the data to the output file. 
+    /// Read from an input file, store the data in data structure  and write the data to the output file. 
     Read_input(pAAR);    
 
     /// Initialize quantities.
     Processor_domain(pAAR); 
 
     // allocate memory to store phi(x) in domain 
-    pAAR->phi = (double***) calloc((pAAR->np_z+2*pAAR->FDn),  sizeof(double**));  
+    pAAR->phi = (double***) calloc((pAAR->np_z+2*pAAR->FDn), sizeof(double**));  
     assert(pAAR->phi !=  NULL); 
 
     for (k = 0; k < pAAR->np_z+2*pAAR->FDn; k++) {
-        pAAR->phi[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn),  sizeof(double*));  
+        pAAR->phi[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn), sizeof(double*));  
         assert(pAAR->phi[k] !=  NULL); 
 
         for (j = 0; j < pAAR->np_y+2*pAAR->FDn; j++) {
-            pAAR->phi[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn),  sizeof(double));  
+            pAAR->phi[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn), sizeof(double));  
             assert(pAAR->phi[k][j] !=  NULL); 
         }
     }
 
-    pAAR->res = (double***) calloc((pAAR->np_z+2*pAAR->FDn),  sizeof(double**));  
+    pAAR->res = (double***) calloc((pAAR->np_z+2*pAAR->FDn), sizeof(double**));  
     assert(pAAR->res !=  NULL); 
 
     for (k = 0; k < pAAR->np_z+2*pAAR->FDn; k++) {
-        pAAR->res[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn),  sizeof(double*));  
+        pAAR->res[k] = (double**) calloc((pAAR->np_y+2*pAAR->FDn), sizeof(double*));  
         assert(pAAR->res[k] !=  NULL); 
 
         for (j = 0; j < pAAR->np_y+2*pAAR->FDn; j++) {
-            pAAR->res[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn),  sizeof(double));  
+            pAAR->res[k][j] = (double*) calloc((pAAR->np_x+2*pAAR->FDn), sizeof(double));  
             assert(pAAR->res[k][j] !=  NULL); 
         }
     }
 
-    pAAR->rhs = (double***) calloc(pAAR->np_z,  sizeof(double**));   
+    pAAR->rhs = (double***) calloc(pAAR->np_z, sizeof(double**));   
     for (k = 0; k < pAAR->np_z; k++) {
-        pAAR->rhs[k] = (double**) calloc(pAAR->np_y,  sizeof(double*));  // need to de-allocate 
+        pAAR->rhs[k] = (double**) calloc(pAAR->np_y, sizeof(double*));  // need to de-allocate 
         for (j = 0; j < pAAR->np_y; j++) {
-            pAAR->rhs[k][j] = (double*) calloc(pAAR->np_x,  sizeof(double));  
+            pAAR->rhs[k][j] = (double*) calloc(pAAR->np_x, sizeof(double));  
         }
     }
 
-    pAAR->phi_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z,  sizeof(double));  
-    pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z,  sizeof(double));  
+    pAAR->phi_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
+    pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
 
       // random RHS -------------------------------
     srand(rank);   
@@ -119,7 +119,7 @@ void Initialize(DS_AAR* pAAR) {
             }
         }
     }
-    MPI_Allreduce(&rhs_sum,  &rhs_sum_global,  1,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
+    MPI_Allreduce(&rhs_sum, &rhs_sum_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
     rhs_sum_global = rhs_sum_global/(pAAR->n_int[0]*pAAR->n_int[1]*pAAR->n_int[2]); 
       //rhs_sum = 0; 
     for (k = 0; k < pAAR->np_z; k++) {
@@ -148,21 +148,21 @@ void Initialize(DS_AAR* pAAR) {
     Laplacian_Comm_Indices(pAAR);  // compute communication indices information for Laplacian     
 }
 
-void Read_input(DS_AAR* pAAR) {
+void Read_input(DS* pAAR) {
     int rank, p, i; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     double Nr, Dr, val; 
 
   // ----------------- Bcast ints together and doubles together (two MPI_Bcast 's) --------------------
-    int bcast_int[2] = {pAAR->m_aar, pAAR->p_aar}; 
-    double bcast_double[3] = {pAAR->solver_tol, pAAR->omega_aar, pAAR->beta_aar}; 
+    int bcast_int[2] = {pAAR->m, pAAR->p}; 
+    double bcast_double[3] = {pAAR->solver_tol, pAAR->omega, pAAR->beta}; 
     MPI_Bcast(bcast_int, 2, MPI_INT, 0, MPI_COMM_WORLD); 
-    pAAR->m_aar = bcast_int[0] ; 
-    pAAR->p_aar = bcast_int[1] ; 
+    pAAR->m = bcast_int[0] ; 
+    pAAR->p = bcast_int[1] ; 
     MPI_Bcast(bcast_double, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);   
     pAAR->solver_tol = bcast_double[0] ; 
-    pAAR->omega_aar = bcast_double[1] ; 
-    pAAR->beta_aar = bcast_double[2] ; 
+    pAAR->omega = bcast_double[1] ; 
+    pAAR->beta = bcast_double[2] ; 
 
     pAAR->non_blocking = 1;  // allows overlap of communication and computation in some cases
     pAAR->solver_maxiter = 1000; 
@@ -173,16 +173,16 @@ void Read_input(DS_AAR* pAAR) {
     if (rank  ==  0) {
         //printf("FD order    : %u \n", 2*pAAR->FDn); 
         printf("solver_tol  : %g \n", pAAR->solver_tol); 
-        printf("omega_aar   : %.2f \n", pAAR->omega_aar); 
-        printf("beta_aar    : %.2f \n", pAAR->beta_aar); 
-        printf("m_aar       : %d \n", pAAR->m_aar);  
-        printf("p_aar       : %d \n", pAAR->p_aar); 
+        printf("omega   : %.2f \n", pAAR->omega); 
+        printf("beta    : %.2f \n", pAAR->beta); 
+        printf("m       : %d \n", pAAR->m);  
+        printf("p       : %d \n", pAAR->p); 
         printf("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% \n"); 
-        printf("nprocx = %u,  nprocy = %u,  nprocz = %u. \n", pAAR->nprocx, pAAR->nprocy, pAAR->nprocz); 
+        printf("nprocx = %u, nprocy = %u, nprocz = %u. \n", pAAR->nprocx, pAAR->nprocy, pAAR->nprocz); 
     }
 
 // Compute Finite Difference coefficients for Laplacian (Del^2)
-    pAAR->coeff_lap = (double*) calloc((pAAR->FDn+1),  sizeof(double)); 
+    pAAR->coeff_lap = (double*) calloc((pAAR->FDn+1), sizeof(double)); 
     pAAR->coeff_lap[0] = 0; 
     for (p = 1;  p <= pAAR->FDn;  p++)
         pAAR->coeff_lap[0]+=  -(2.0/(p*p)); 
@@ -200,7 +200,7 @@ void Read_input(DS_AAR* pAAR) {
 }
 
 // function to compute end nodes of processor domain
-void Processor_domain(DS_AAR* pAAR) {
+void Processor_domain(DS* pAAR) {
     int rank, count, countx, county, countz; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     
@@ -221,7 +221,7 @@ void Processor_domain(DS_AAR* pAAR) {
     ndpy = round((double)pAAR->n_int[1]/pAAR->nprocy); 
     ndpz = round((double)pAAR->n_int[2]/pAAR->nprocz); 
     
-    // Based on the current processor's rank,  compute the processor domain end nodes,  ordering the processors as z, y, x
+    // Based on the current processor's rank, compute the processor domain end nodes, ordering the processors as z, y, x
     count = 0; 
     for (countx = 0; countx < pAAR->nprocx; countx++) { // loop over all processors count
         for (county = 0; county < pAAR->nprocy; county++){
@@ -232,7 +232,7 @@ void Processor_domain(DS_AAR* pAAR) {
                     ndpy_curr = ndpy; 
                     ndpz_curr = ndpz; 
 
-                    // Start and End node indices of processor domain,  w.r.t main domain. Assuming main domain indexing starts from zero. 
+                    // Start and End node indices of processor domain, w.r.t main domain. Assuming main domain indexing starts from zero. 
                     pAAR->pnode_s[0] = countx*ndpx;  pAAR->pnode_e[0] = pAAR->pnode_s[0]+ndpx_curr-1; 
                     pAAR->pnode_s[1] = county*ndpy;  pAAR->pnode_e[1] = pAAR->pnode_s[1]+ndpy_curr-1; 
                     pAAR->pnode_s[2] = countz*ndpz;  pAAR->pnode_e[2] = pAAR->pnode_s[2]+ndpz_curr-1; 
@@ -249,7 +249,7 @@ void Processor_domain(DS_AAR* pAAR) {
 
 
 // function to create communicator topologies
-void Comm_topologies(DS_AAR* pAAR) {
+void Comm_topologies(DS* pAAR) {
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     int reorder = 0, j; 
@@ -270,10 +270,10 @@ void Comm_topologies(DS_AAR* pAAR) {
 
     int nneigh = 6*ceil((double)(pAAR->FDn-(1e-12))/pAAR->np_x);  // total number of neighbors
     int *neighs, count = 0; 
-    neighs = (int*) calloc(nneigh,  sizeof(int));  
-    pAAR->neighs_lap = (int*) calloc(nneigh,  sizeof(int));  
+    neighs = (int*) calloc(nneigh, sizeof(int));  
+    pAAR->neighs_lap = (int*) calloc(nneigh, sizeof(int));  
 
-    int proc_l, proc_r, proc_u, proc_d, proc_f, proc_b;  // procs on left, right,  up, down,  front, back of the current proc
+    int proc_l, proc_r, proc_u, proc_d, proc_f, proc_b;  // procs on left, right, up, down, front, back of the current proc
     for (j = 0; j < ceil((double)(pAAR->FDn-(1e-12))/pAAR->np_x); j++) { // no. of layers of nearest neighbors required for FD stencil
         MPI_Cart_shift(topocomm, 0, j+1, &proc_l, &proc_r);   // x-direction
         MPI_Cart_shift(topocomm, 1, j+1, &proc_b, &proc_f);   // y-direction
@@ -291,7 +291,7 @@ void Comm_topologies(DS_AAR* pAAR) {
     }
 
     MPI_Comm comm_dist_graph_cart;  // communicator with cartesian distributed graph topology
-    MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, nneigh, neighs, (int *)MPI_UNWEIGHTED, nneigh, neighs, (int *)MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, &comm_dist_graph_cart);  // creates a distributed graph topology (adjacent,  cartesian)
+    MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, nneigh, neighs, (int *)MPI_UNWEIGHTED, nneigh, neighs, (int *)MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, &comm_dist_graph_cart);  // creates a distributed graph topology (adjacent, cartesian)
     pAAR->comm_laplacian = comm_dist_graph_cart; 
 
     // de-allocate neighs
@@ -300,7 +300,7 @@ void Comm_topologies(DS_AAR* pAAR) {
 
 // compute preconditioned relative residual
 
-void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart) {
+void PoissonResidual(DS *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart) {
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     int **eout_s, **eout_e, **ein_s, **ein_e, **stencil_sign, **edge_ind, *displs_send, *displs_recv, *ncounts_send, *ncounts_recv;
@@ -310,18 +310,18 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
 
     // STEPS TO FOLLOW:
     // Create a contiguous vector of the stencil points to send to neigh procs and receive in a similar vector the ghost point data for the edge stencil points
-    // Before the communication (for non-blocking code) finishes,  compute lap_phi for nodes that are inside proc domain,  which are stencil width away from domain boundary
-    // After the communication is done,  using the ghost point data,  evaluate lap_phi for the points in the stencil region
+    // Before the communication (for non-blocking code) finishes, compute lap_phi for nodes that are inside proc domain, which are stencil width away from domain boundary
+    // After the communication is done, using the ghost point data, evaluate lap_phi for the points in the stencil region
     // Find phi_new from lap_phi and phi_old
 
     // Assemble an array of phi at stencil points for communication.
-    // This array should go over the list of neigh procs and accumulate the points,  in the order x, y, z with left and rights in each direction
+    // This array should go over the list of neigh procs and accumulate the points, in the order x, y, z with left and rights in each direction
     int np_edge = FDn*np*np;  // no. of nodes in the stencil communication region across each face of processor domain. Six such regions communicate.
     int i, j, k, a, edge_count, neigh_count, proc_dir, proc_lr; 
     double *phi_edge_in, *phi_edge_out;  // linear array to store input and output communication data/buffer to and from the processor
-    phi_edge_in = (double*) calloc(6*np_edge,  sizeof(double));  
-    phi_edge_out = (double*) calloc(6*np_edge,  sizeof(double));   
-    double lap_phi_k,  TEMP_TOL = 1e-12; 
+    phi_edge_in = (double*) calloc(6*np_edge, sizeof(double));  
+    phi_edge_out = (double*) calloc(6*np_edge, sizeof(double));   
+    double lap_phi_k, TEMP_TOL = 1e-12; 
     int neigh_level, nneigh = ceil((double)(FDn-TEMP_TOL)/np); 
     double ***rhs = pAAR->rhs;
     for (k = 0; k < np+2*FDn; k++) 
@@ -333,7 +333,7 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
     double ***phi_old = pAAR->phi;
     double ***phi_res = pAAR->res;
 
-    // Setup the outgoing array phi_edge_out with the phi values from edges of the proc domain. Order: First loop over procs x, y, z direc and then for each proc,  x, y, z over nodes in the edge region
+    // Setup the outgoing array phi_edge_out with the phi values from edges of the proc domain. Order: First loop over procs x, y, z direc and then for each proc, x, y, z over nodes in the edge region
     edge_count = 0; 
     neigh_count = 0; 
     for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
@@ -425,7 +425,7 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
             for (k = pAAR->LapInd.ereg_s[2][neigh_count]; k <= pAAR->LapInd.ereg_e[2][neigh_count]; k++) { // z-direction of edge region
                 for (j = pAAR->LapInd.ereg_s[1][neigh_count]; j <= pAAR->LapInd.ereg_e[1][neigh_count]; j++) { // y-direction of edge region
                     for (i = pAAR->LapInd.ereg_s[0][neigh_count]; i <= pAAR->LapInd.ereg_e[0][neigh_count]; i++) { // x-direction of edge region
-                        //i, j, k indexes are w.r.t proc domain,  but phi_old and new arrays are on proc+FDn domain
+                        //i, j, k indexes are w.r.t proc domain, but phi_old and new arrays are on proc+FDn domain
                             lap_phi_k = 0.0;  
                             
                         for (a = (edge_ind[0][temp]+1); a <= FDn; a++)  // x-direction
@@ -459,37 +459,37 @@ void PoissonResidual(DS_AAR *pAAR, double *phi_v, double *res, int np, int FDn, 
 ///////////////////////////////////////////////////////////////////////////////
 
 // function to compute comm indices and arrays
-void Laplacian_Comm_Indices(DS_AAR* pAAR) {
+void Laplacian_Comm_Indices(DS* pAAR) {
     double TEMP_TOL = 1e-12; 
   // compute edge index information to compute residual to be used in the solver
     int nneigh = 6*ceil((double)pAAR->FDn-TEMP_TOL/pAAR->np_x), k, num; 
   // allocate memory to store arrays for MPI communication
-    pAAR->LapInd.displs_send = (int*) calloc(nneigh,  sizeof(int)); 
-    pAAR->LapInd.ncounts_send = (int*) calloc(nneigh,  sizeof(int)); 
-    pAAR->LapInd.displs_recv = (int*) calloc(nneigh,  sizeof(int)); 
-    pAAR->LapInd.ncounts_recv = (int*) calloc(nneigh,  sizeof(int)); 
-    pAAR->LapInd.eout_s = (int**) calloc(3,  sizeof(int*));  
-    pAAR->LapInd.eout_e = (int**) calloc(3,  sizeof(int*));  
-    pAAR->LapInd.ein_s = (int**) calloc(3,  sizeof(int*)); ;  
-    pAAR->LapInd.ein_e = (int**) calloc(3,  sizeof(int*));  
-    pAAR->LapInd.stencil_sign = (int**) calloc(3,  sizeof(int*));  
-    pAAR->LapInd.edge_ind = (int**) calloc(3,  sizeof(int*));  
+    pAAR->LapInd.displs_send = (int*) calloc(nneigh, sizeof(int)); 
+    pAAR->LapInd.ncounts_send = (int*) calloc(nneigh, sizeof(int)); 
+    pAAR->LapInd.displs_recv = (int*) calloc(nneigh, sizeof(int)); 
+    pAAR->LapInd.ncounts_recv = (int*) calloc(nneigh, sizeof(int)); 
+    pAAR->LapInd.eout_s = (int**) calloc(3, sizeof(int*));  
+    pAAR->LapInd.eout_e = (int**) calloc(3, sizeof(int*));  
+    pAAR->LapInd.ein_s = (int**) calloc(3, sizeof(int*)); ;  
+    pAAR->LapInd.ein_e = (int**) calloc(3, sizeof(int*));  
+    pAAR->LapInd.stencil_sign = (int**) calloc(3, sizeof(int*));  
+    pAAR->LapInd.edge_ind = (int**) calloc(3, sizeof(int*));  
     for (k = 0; k < 3; k++) {
-        pAAR->LapInd.eout_s[k] = (int*) calloc(nneigh,  sizeof(int));  
-        pAAR->LapInd.eout_e[k] = (int*) calloc(nneigh,  sizeof(int));  
-        pAAR->LapInd.ein_s[k] = (int*) calloc(nneigh,  sizeof(int));  
-        pAAR->LapInd.ein_e[k] = (int*) calloc(nneigh,  sizeof(int));  
+        pAAR->LapInd.eout_s[k] = (int*) calloc(nneigh, sizeof(int));  
+        pAAR->LapInd.eout_e[k] = (int*) calloc(nneigh, sizeof(int));  
+        pAAR->LapInd.ein_s[k] = (int*) calloc(nneigh, sizeof(int));  
+        pAAR->LapInd.ein_e[k] = (int*) calloc(nneigh, sizeof(int));  
         num = pAAR->FDn*pAAR->FDn*pAAR->FDn*8 + pAAR->FDn*pAAR->FDn*(pAAR->np_x-2*pAAR->FDn)*12 + pAAR->FDn*(pAAR->np_x-2*pAAR->FDn)*(pAAR->np_x-2*pAAR->FDn)*6; 
-        pAAR->LapInd.stencil_sign[k] = (int*) calloc(num,  sizeof(int));  
-        pAAR->LapInd.edge_ind[k] = (int*) calloc(num,  sizeof(int)); 
+        pAAR->LapInd.stencil_sign[k] = (int*) calloc(num, sizeof(int));  
+        pAAR->LapInd.edge_ind[k] = (int*) calloc(num, sizeof(int)); 
     }
 
-    EdgeIndicesForPoisson(pAAR,  pAAR->LapInd.eout_s, pAAR->LapInd.eout_e,  pAAR->LapInd.ein_s, pAAR->LapInd.ein_e,  pAAR->LapInd.ereg_s, pAAR->LapInd.ereg_e,  pAAR->LapInd.stencil_sign, pAAR->LapInd.edge_ind,  pAAR->LapInd.displs_send, pAAR->LapInd.displs_recv, pAAR->LapInd.ncounts_send, pAAR->LapInd.ncounts_recv);  
+    EdgeIndicesForPoisson(pAAR, pAAR->LapInd.eout_s, pAAR->LapInd.eout_e, pAAR->LapInd.ein_s, pAAR->LapInd.ein_e, pAAR->LapInd.ereg_s, pAAR->LapInd.ereg_e, pAAR->LapInd.stencil_sign, pAAR->LapInd.edge_ind, pAAR->LapInd.displs_send, pAAR->LapInd.displs_recv, pAAR->LapInd.ncounts_send, pAAR->LapInd.ncounts_recv);  
 }
 
 
 // function to compute edge region indices
-void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein_s, int **ein_e,  int ereg_s[3][26], int ereg_e[3][26], 
+void EdgeIndicesForPoisson(DS* pAAR, int **eout_s, int **eout_e, int **ein_s, int **ein_e, int ereg_s[3][26], int ereg_e[3][26], 
                             int **stencil_sign, int **edge_ind, int *displs_send, int *displs_recv, int *ncounts_send, int *ncounts_recv) {
     // eout: start(s) and end(e) node indices w.r.t proc domain of the outgoing edges
     // ein : start(s) and end(e) node indices w.r.t proc domain of the incoming edges
@@ -500,10 +500,10 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     double TEMP_TOL = 1e-12; 
     int i, j, k, ii, jj, kk, edge_count = 0, neigh_count, proc_dir, proc_lr; 
     int np = pAAR->np_x;  // no. of nodes in each direction of processor domain
-    int edge_s[3], edge_e[3];  // start and end nodes of the edge region in 3 directions,  indicies w.r.t local processor domain
+    int edge_s[3], edge_e[3];  // start and end nodes of the edge region in 3 directions, indicies w.r.t local processor domain
     int neigh_level, nneigh = ceil((double)(pAAR->FDn-TEMP_TOL)/pAAR->np_x); 
 
-    // Setup the outgoing array phi_edge_out with the phi values from edges of the proc domain. Order: First loop over procs x, y, z direc and then for each proc,  x, y, z over nodes in the edge region
+    // Setup the outgoing array phi_edge_out with the phi values from edges of the proc domain. Order: First loop over procs x, y, z direc and then for each proc, x, y, z over nodes in the edge region
     edge_count = 0; 
     displs_send[0] = 0; 
     for (neigh_level = 0; neigh_level < nneigh; neigh_level++) { // loop over layers of nearest neighbors
@@ -514,11 +514,11 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
                 if (edge_count>0)
                     displs_send[edge_count] = displs_send[edge_count-1]+ncounts_send[edge_count-1];  // relative displacement of index in out going array 
 
-                // for each neigh proc,  compute start and end nodes of the communication region of size FDn x np x np
+                // for each neigh proc, compute start and end nodes of the communication region of size FDn x np x np
                 edge_s[0] = 0; edge_s[1] = 0; edge_s[2] = 0;  // initialize all start nodes to start node of proc domain i.e. zero
                 edge_e[0] = np-1; edge_e[1] = np-1; edge_e[2] = np-1;  // initialize all end nodes to end node of proc domain i.e. np-1
 
-                if (neigh_level+1  ==  nneigh) { // for outermost neigh layer,  need only part of the domains           
+                if (neigh_level+1  ==  nneigh) { // for outermost neigh layer, need only part of the domains           
                     ncounts_send[edge_count] = pAAR->np_x*pAAR->np_x*(pAAR->FDn-floor((double)(pAAR->FDn-TEMP_TOL)/pAAR->np_x)*pAAR->np_x);  // update no. of nodes (only partial required)
                     if (edge_count>0)
                         displs_send[edge_count] = displs_send[edge_count-1]+ncounts_send[edge_count-1];  // relative displacement of index in out going array 
@@ -539,16 +539,16 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     }
 
     int **ein_s_temp, **ein_e_temp; 
-    ein_s_temp = (int**) calloc(3,  sizeof(int*));  
-    ein_e_temp = (int**) calloc(3,  sizeof(int*));  
+    ein_s_temp = (int**) calloc(3, sizeof(int*));  
+    ein_e_temp = (int**) calloc(3, sizeof(int*));  
     for (k = 0; k < 3; k++) {
-        ein_s_temp[k] = (int*) calloc(6*nneigh,  sizeof(int));  
-        ein_e_temp[k] = (int*) calloc(6*nneigh,  sizeof(int));        
+        ein_s_temp[k] = (int*) calloc(6*nneigh, sizeof(int));  
+        ein_e_temp[k] = (int*) calloc(6*nneigh, sizeof(int));        
     }
 
     int *mark_off, *send_ind_arry;  
-    mark_off = (int*) calloc(6*nneigh,  sizeof(int)); 
-    send_ind_arry = (int*) calloc(6*nneigh,  sizeof(int)); 
+    mark_off = (int*) calloc(6*nneigh, sizeof(int)); 
+    send_ind_arry = (int*) calloc(6*nneigh, sizeof(int)); 
     int send_ind, ccnt, rep_dist, ctr, rep_dist_old = 0, rep_ind, rep_ind_old = 0; 
 
     // Store the incoming buffer data from phi_edge_in into the outer stencil regions of phi_old array
@@ -585,7 +585,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
                 send_ind = rep_ind_old; 
                 mark_off[send_ind] = 1;  // min distance proc marked off. Will not be considered next time.
                 ncounts_recv[edge_count] = ncounts_send[send_ind]; 
-                send_ind_arry[edge_count] = send_ind;  // stores the proc index to which buffer will be sent from current proc in the order of "count". So when count = 0,  buffer of size ncounts_recv[0] will first be received from neigh proc send_ind_arry[0] whose corresponding proc rank is pAAR->neighs_lap[send_ind_arry[0]].
+                send_ind_arry[edge_count] = send_ind;  // stores the proc index to which buffer will be sent from current proc in the order of "count". So when count = 0, buffer of size ncounts_recv[0] will first be received from neigh proc send_ind_arry[0] whose corresponding proc rank is pAAR->neighs_lap[send_ind_arry[0]].
 
                 edge_count +=  1; 
             }
@@ -612,11 +612,11 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
         for (proc_dir = 0; proc_dir < 3; proc_dir++) { // loop over directions (loop over neighbor procs) ---> 0, 1, 2 = x, y, z direcs
             for (proc_lr = 0; proc_lr < 2; proc_lr++) { // loop over left & right (loop over neighbor procs) ----> 0, 1 = left, right
 
-                // for each neigh proc,  compute start and end nodes of the communication region of size FDn x np x np
+                // for each neigh proc, compute start and end nodes of the communication region of size FDn x np x np
                 edge_s[0] = pAAR->FDn-1+1; edge_s[1] = pAAR->FDn-1+1; edge_s[2] = pAAR->FDn-1+1;  // initialize all start nodes to start node of proc domain i.e. FDn-1+1 (w.r.t proc+FDn)
                 edge_e[0] = np-1+pAAR->FDn; edge_e[1] = np-1+pAAR->FDn; edge_e[2] = np-1+pAAR->FDn;  // initialize all end nodes to end node of proc domain i.e. np-1+FDn
 
-                if (neigh_level+1  ==  nneigh) { // for outermost neigh layer,  need only part of the domain
+                if (neigh_level+1  ==  nneigh) { // for outermost neigh layer, need only part of the domain
                     if ((proc_lr)  ==  1) { // for right neigh proc
                         edge_s[proc_dir] = np+pAAR->FDn+1-1+floor((double)(pAAR->FDn-TEMP_TOL)/pAAR->np_x)*pAAR->np_x;  // update the start node for the edge region in the direction of proc dir which is only FDn width
                         edge_e[proc_dir] = np+2*pAAR->FDn-1; 
@@ -661,7 +661,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
     }
 
     if (pAAR->np_x > 2*pAAR->FDn) {
-        // Indices for boundary regions to do remaining partial stencil correction -- 26 boundary regions = (6 faces, 12 edges,  8 corners)
+        // Indices for boundary regions to do remaining partial stencil correction -- 26 boundary regions = (6 faces, 12 edges, 8 corners)
 
         edge_count = 0; 
         // loop over 6 faces = 3x2
@@ -721,7 +721,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
             for (k = ereg_s[2][neigh_count]; k <= ereg_e[2][neigh_count]; k++) { // z-direction of edge region
                 for (j = ereg_s[1][neigh_count]; j <= ereg_e[1][neigh_count]; j++) { // y-direction of edge region
                     for (i = ereg_s[0][neigh_count]; i <= ereg_e[0][neigh_count]; i++) { // x-direction of edge region
-                        //i, j, k indices are w.r.t proc domain,  but phi_old and new arrays are on proc+FDn domain
+                        //i, j, k indices are w.r.t proc domain, but phi_old and new arrays are on proc+FDn domain
                         if (i-0  <=  np-1-i) { // index i closer to left edge
                             stencil_sign[0][temp] = 1;  // full half stencil can be updated on right side
                             edge_ind[0][temp] = min(pAAR->FDn, i-0); 
@@ -771,7 +771,7 @@ void EdgeIndicesForPoisson(DS_AAR* pAAR,  int **eout_s, int **eout_e,  int **ein
 // Deallocate memory
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-void Deallocate_memory(DS_AAR* pAAR)  {
+void Deallocate_memory(DS* pAAR)  {
     int j, k; 
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 

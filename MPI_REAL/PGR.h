@@ -17,10 +17,10 @@
 
 void AAR(DS_AAR* pAAR, 
     void (*PoissonResidual)(DS_AAR*, double*, double*, int, int, MPI_Comm),
-    double *x, double *rhs, double omega_aar, double beta_aar, int m_aar, int p_aar, 
+    double *x, double *rhs, double omega, double beta, int m, int p, 
     int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart);
 
-void AndersonExtrapolation(double **DX, double **DF, double *f, double beta_mix, int m,
-    int N, double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec, double *x, double *x_old); 
+void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, double *f, double beta_mix, 
+    int m, int N, double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec); 
 
 #endif

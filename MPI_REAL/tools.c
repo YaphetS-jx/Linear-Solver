@@ -12,8 +12,10 @@
 #include "tools.h"
 
 // function to compute 2-norm of a vector
-void Vector2Norm(double* Vec,  int len,  double* ResVal) { // Vec is the pointer to the vector,  len is the length of the vector Vec,  and ResVal is the pointer to the residual value
-    int rank,  k; 
+// Vec is the pointer to the vector, len is the length of the vector Vec, and ResVal is the pointer to the residual value
+void Vector2Norm(double* Vec, int len, double* ResVal) 
+{ 
+    int rank, k; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
     double res = 0; 
@@ -21,26 +23,26 @@ void Vector2Norm(double* Vec,  int len,  double* ResVal) { // Vec is the pointer
         res = res + Vec[k]*Vec[k]; 
 
     double res_global; 
-    MPI_Allreduce(&res,  &res_global,  1,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
+    MPI_Allreduce(&res, &res_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
 
     res_global = sqrt(res_global); 
 
     *ResVal = res_global; 
 }
 
-
-void PseudoInverseTimesVec(double **A, double *b, double *x, int m) { // returns x = pinv(A)*b,  matrix A is m x m  and vector b is m x 1
-
+// x = pinv(A)*b, matrix A is m x m  and vector b is m x 1
+void PseudoInverseTimesVec(double **A, double *b, double *x, int m) 
+{
     int i, j, k, ctr, jj; 
     double **U, **V, *w;  // A matrix in column major format as Ac. w is the array of singular values
-    U = (double**) calloc(m,  sizeof(double*));   
-    V = (double**) calloc(m,  sizeof(double*)); 
+    U = (double**) calloc(m, sizeof(double*));   
+    V = (double**) calloc(m, sizeof(double*)); 
     for (k = 0; k < m; k++)
     {
-      U[k] = (double*) calloc(m,  sizeof(double));   
-      V[k] = (double*) calloc(m,  sizeof(double));   
+      U[k] = (double*) calloc(m, sizeof(double));   
+      V[k] = (double*) calloc(m, sizeof(double));   
     }
-    w = (double*) calloc(m,  sizeof(double));   
+    w = (double*) calloc(m, sizeof(double));   
 
     for (j = 0; j < m; j++) { 
         for (i = 0; i < m; i++) { 
@@ -53,7 +55,7 @@ void PseudoInverseTimesVec(double **A, double *b, double *x, int m) { // returns
 
     // Find Pseudoinverse times vector (pinv(A)*b = (V * diag(1/wj) * U') * b)
     double s, *tmp; 
-    tmp = (double*) calloc(m,  sizeof(double));  
+    tmp = (double*) calloc(m, sizeof(double));  
     // diag(1/wj) * U'*b
     for (j = 0; j < m; j++) { 
         s = 0.0; 
@@ -84,12 +86,14 @@ void PseudoInverseTimesVec(double **A, double *b, double *x, int m) { // returns
     free(tmp); 
 }
 
-// a is matrix (array) size m x n,  A = UWV'. U replaces "a" on output. w is an array of singular values,  size 1 x n. V is output as matrix v of size n x n. 
-void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) { 
+// a is matrix (array) size m x n, A = UWV'. U replaces "a" on output. 
+// w is an array of singular values, size 1 x n. V is output as matrix v of size n x n. 
+void SingularValueDecomp(double **a, int m, int n, double *w, double **v) 
+{ 
     int flag, i, its, j, jj, k, l, nm, Max_its = 250; 
     double anorm, c, f, g, h, s, scale, x, y, z, *rv1; 
 
-    rv1 = (double*) calloc(n,  sizeof(double));   
+    rv1 = (double*) calloc(n, sizeof(double));   
     g = scale = anorm = 0.0; 
     // Householder reduction to bidiagonal form
     for (i = 0; i < n; i++) {
@@ -196,7 +200,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
         ++a[i][i]; 
     } // end for over i
 
-    // Diagonalization of the bidiagonal form: Loop over singular values,  and over allowed iterations
+    // Diagonalization of the bidiagonal form: Loop over singular values, and over allowed iterations
     for (k = n-1; k>= 0; k--) {
         for (its = 0; its <= Max_its; its++) {
             flag = 1; 
@@ -210,7 +214,7 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
                     break; 
             } // end for over l
             if (flag) {
-                c = 0.0;  // Cancellation of rv1[1],  if l>1
+                c = 0.0;  // Cancellation of rv1[1], if l>1
                 s = 1.0; 
                 for (i = l; i <= k; i++) {
                     f = s*rv1[i]; 
@@ -311,7 +315,8 @@ void SingularValueDecomp(double **a, int m, int n,  double *w,  double **v) {
 }
 
 // computes (a^2 + b^2)^0.5
-double pythag(double a,  double b) {
+double pythag(double a, double b) 
+{
     double absa, absb; 
     absa = fabs(a); 
     absb = fabs(b); 

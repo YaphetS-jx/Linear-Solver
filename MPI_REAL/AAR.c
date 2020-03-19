@@ -11,12 +11,12 @@
 
 #include "AAR.h"
 
-void AAR(DS_AAR* pAAR,
-        void (*PoissonResidual)(DS_AAR*, double*, double*, int, int, MPI_Comm),
+void AAR(DS* pAAR,
+        void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
         double *x, double *rhs, double omega, double beta, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart) 
 {
-    int rank, i, j, k, col, iter; 
+    int rank, i, col, iter; 
     double *f, *x_old, *f_old, **DX, **DF, *am_vec, t0, t1;
     double **FtF, *allredvec, *Ftf, *svec, relf, rhs_norm;  
     //////////////////////////////////////////////////////////
@@ -36,11 +36,11 @@ void AAR(DS_AAR* pAAR,
     FtF = (double**) calloc(m, sizeof(double*));
     assert(DF !=  NULL && DX != NULL && FtF != NULL); 
 
-    for (k = 0; k < m; k++) {
-        DX[k] = (double*)calloc(Np, sizeof(double)); 
-        DF[k] = (double*)calloc(Np, sizeof(double)); 
-        FtF[k] = (double*)calloc(m, sizeof(double)); 
-        assert(DX[k] !=  NULL && DF[k] !=  NULL && FtF[k] !=  NULL); 
+    for (i = 0; i < m; i++) {
+        DX[i] = (double*)calloc(Np, sizeof(double)); 
+        DF[i] = (double*)calloc(Np, sizeof(double)); 
+        FtF[i] = (double*)calloc(m, sizeof(double)); 
+        assert(DX[i] !=  NULL && DF[i] !=  NULL && FtF[i] !=  NULL); 
     }
     
     am_vec = (double*)calloc(Np, sizeof(double));  
@@ -61,8 +61,7 @@ void AAR(DS_AAR* pAAR,
 #endif
 
     t0 = MPI_Wtime(); 
-    
-    // begin while loop
+
     while (relf > tol && iter  <=  max_iter) {
         //----------Store Residual & Iterate History----------//
         if(iter>1) {
@@ -82,7 +81,7 @@ void AAR(DS_AAR* pAAR,
         if(iter % p == 0 && iter>1) {
             // x_new = x_prev + beta*f - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*f));
 
-            AndersonExtrapolation(DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec, x, x_old); 
+            AndersonExtrapolation(x, x_old, DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec); 
 
             PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
 
@@ -103,12 +102,12 @@ void AAR(DS_AAR* pAAR,
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relf);
-    if(rank == 0) printf("preconditioned relf: %g\n", relf/rhs_norm);
+    if(rank == 0) printf("preconditioned Relative Residual: %g\n", relf/rhs_norm);
 #endif
         }
 
         iter = iter+1; 
-    } // end while loop
+    } 
 
     t1 = MPI_Wtime(); 
     if(rank  ==  0) {
@@ -127,10 +126,10 @@ void AAR(DS_AAR* pAAR,
     free(f_old); 
     free(am_vec); 
   
-    for (k = 0; k < m; k++) {
-      free(DX[k]); 
-      free(DF[k]); 
-      free(FtF[k]); 
+    for (i = 0; i < m; i++) {
+      free(DX[i]); 
+      free(DF[i]); 
+      free(FtF[i]); 
     }
     free(DX); 
     free(DF); 
@@ -140,8 +139,15 @@ void AAR(DS_AAR* pAAR,
     free(allredvec); 
 }
 
-void AndersonExtrapolation(double **DX,  double **DF,  double *f,  double beta,  int m,  int Np,  double *am_vec,  
-                            double **FtF,  double *allredvec,  double *Ftf,  double *svec, double *x, double *x_old) {
+/**
+ * @brief   Anderson update
+ *
+ *          x_new = x_prev + beta*f - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*f));
+ */
+
+void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, double *f, double beta, int m, int Np, 
+                            double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec) 
+{
     // DX and DF are iterate and preconditioned residual history matrices of size Npxm where Np = no. of nodes in proc domain
     // am_vec is the final update vector of size Npx1
     // f is the preconditioned residual vector at current iteration of fixed point method
@@ -172,7 +178,7 @@ void AndersonExtrapolation(double **DX,  double **DF,  double *f,  double beta, 
         allredvec[ctr++] = temp_sum; 
     }
 
-    MPI_Allreduce(MPI_IN_PLACE,  allredvec,  m*m+m,  MPI_DOUBLE,  MPI_SUM,  MPI_COMM_WORLD); 
+    MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
 
     ctr = 0; 
     for (j = 0; j < m; j++) 
