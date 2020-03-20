@@ -300,7 +300,7 @@ void Comm_topologies(DS* pAAR) {
 
 // compute preconditioned relative residual
 
-void PoissonResidual(DS *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart) {
+void PoissonResidual(DS *pAAR, double *phi_v, double *Ax, int np, int FDn, MPI_Comm comm_dist_graph_cart) {
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     int **eout_s, **eout_e, **ein_s, **ein_e, **stencil_sign, **edge_ind, *displs_send, *displs_recv, *ncounts_send, *ncounts_recv;
@@ -326,8 +326,10 @@ void PoissonResidual(DS *pAAR, double *phi_v, double *res, int np, int FDn, MPI_
     double ***rhs = pAAR->rhs;
     for (k = 0; k < np+2*FDn; k++) 
         for (j = 0; j < np+2*FDn; j++) 
-            for (i = 0; i < np+2*FDn; i++) 
+            for (i = 0; i < np+2*FDn; i++) {
                 pAAR->phi[k][j][i] = 0;
+                pAAR->res[k][j][i] = 0;
+            }
 
     convert_to_vector3d(pAAR->phi, phi_v, np, np, np, FDn);
     double ***phi_old = pAAR->phi;
@@ -444,13 +446,26 @@ void PoissonResidual(DS *pAAR, double *phi_v, double *res, int np, int FDn, MPI_
             }
         }
     }
-    convert_to_vector(phi_res, res, np, np, np, FDn);
+
+    for (k = 0; k < np; k++) 
+        for (j = 0; j < np; j++) 
+            for (i = 0; i < np; i++) {
+                phi_res[k+FDn][j+FDn][i+FDn] *= -(3*pAAR->coeff_lap[0]/4/M_PI);
+                phi_res[k+FDn][j+FDn][i+FDn] = rhs[k][j][i] - phi_res[k+FDn][j+FDn][i+FDn];
+            }
+
+    convert_to_vector(phi_res, Ax, np, np, np, FDn);
 
     free(phi_edge_in);  //de-allocate memory
     free(phi_edge_out);  //de-allocate memory
 }
 
-
+void Precondition(double diag, double *res, int Np)
+{
+    int i;
+    for (i = 0; i < Np; i ++)
+        res[i] /= diag;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

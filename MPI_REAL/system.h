@@ -64,7 +64,8 @@ void Laplacian_Comm_Indices(DS* pAAR);
 void EdgeIndicesForPoisson(DS* pAAR, int **eout_s,int **eout_e, int **ein_s,int **ein_e, int ereg_s[3][26],
     int ereg_e[3][26],int **stencil_sign,int **edge_ind,int *displs_send,int *displs_recv,int *ncounts_send,int *ncounts_recv);
 void Deallocate_memory(DS* pAAR); 
-void PoissonResidual(DS *pAAR, double *phi_v, double *res, int np, int FDn, MPI_Comm comm_dist_graph_cart);
+void PoissonResidual(DS *pAAR, double *phi_v, double *Ax, int np, int FDn, MPI_Comm comm_dist_graph_cart);
+void Precondition(double diag, double *res, int Np);
 void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
 void convert_to_vector3d(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
 

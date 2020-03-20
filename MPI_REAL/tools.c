@@ -11,8 +11,10 @@
 
 #include "tools.h"
 
-// function to compute 2-norm of a vector
-// Vec is the pointer to the vector, len is the length of the vector Vec, and ResVal is the pointer to the residual value
+/**
+ * @brief   vector 2-norm
+ */
+
 void Vector2Norm(double* Vec, int len, double* ResVal) 
 { 
     int rank, k; 
@@ -30,7 +32,12 @@ void Vector2Norm(double* Vec, int len, double* ResVal)
     *ResVal = res_global; 
 }
 
-// x = pinv(A)*b, matrix A is m x m  and vector b is m x 1
+/**
+ * @brief   Pseudo inverse x vector
+ *
+ *          x = pinv(A)*b
+ */
+
 void PseudoInverseTimesVec(double **A, double *b, double *x, int m) 
 {
     int i, j, k, ctr, jj; 
@@ -86,8 +93,12 @@ void PseudoInverseTimesVec(double **A, double *b, double *x, int m)
     free(tmp); 
 }
 
-// a is matrix (array) size m x n, A = UWV'. U replaces "a" on output. 
-// w is an array of singular values, size 1 x n. V is output as matrix v of size n x n. 
+/**
+ * @brief   Singular Value Decomposition
+ *
+ *          A = UWV', a is updated by u
+ */
+
 void SingularValueDecomp(double **a, int m, int n, double *w, double **v) 
 { 
     int flag, i, its, j, jj, k, l, nm, Max_its = 250; 
@@ -314,12 +325,17 @@ void SingularValueDecomp(double **a, int m, int n, double *w, double **v)
 
 }
 
-// computes (a^2 + b^2)^0.5
+/**
+ * @brief   Pythagorean
+ *
+ *          (a^2 + b^2)^0.5
+ */
+
 double pythag(double a, double b) 
 {
     double absa, absb; 
     absa = fabs(a); 
     absb = fabs(b); 
-    if (absa>absb) return absa*sqrt(1.0+(double)(absb*absb/(absa*absa))); 
+    if (absa > absb) return absa*sqrt(1.0+(double)(absb*absb/(absa*absa))); 
     else return (absb   ==   0.0 ? 0.0 : absb*sqrt(1.0+(double)(absa*absa/(absb*absb)))); 
 }

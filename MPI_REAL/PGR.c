@@ -1,6 +1,6 @@
 /**
- * @file    AAR.c
- * @brief   This file contains functions for Alternating Anderson Richardson solver
+ * @file    PGR.c
+ * @brief   This file contains functions for Periodic Galerkin Richardson solver
  *
  * @author  Xin Jing  < xjing30@gatech.edu>
  *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
@@ -9,11 +9,12 @@
  */
 
 
-#include "AAR.h"
+#include "PGR.h"
 
-void AAR(DS* pAAR,
+void PGR(DS* pAAR,
         void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
-        double *x, double *rhs, double omega, double beta, int m, int p, 
+        void (*Precondition)(double, double *, int),
+        double *x, double *rhs, double omega, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart) 
 {
     int rank, i, col, iter; 
@@ -54,15 +55,18 @@ void AAR(DS* pAAR,
     Vector2Norm(rhs, Np, &rhs_norm); 
     tol *= rhs_norm;
     PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
+    for (i = 0; i < Np; i++)
+        f[i] = rhs[i] - f[i];
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relf);
-    if(!rank) printf("preconditioned Relative Residual: %g\n", relf/rhs_norm);
+    if(!rank) printf("Relative Residual: %g\n", relf/rhs_norm);
 #endif
 
     t0 = MPI_Wtime(); 
 
     while (relf > tol && iter  <=  max_iter) {
+        Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);
         //----------Store Residual & Iterate History----------//
         if(iter>1) {
             col = ((iter-2) % m); 
@@ -84,11 +88,12 @@ void AAR(DS* pAAR,
             AndersonExtrapolation(x, x_old, DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec); 
 
             PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
-
+            for (i = 0; i < Np; i++)
+                f[i] = rhs[i] - f[i];
             Vector2Norm(f, Np, &relf);
 
 #ifdef DEBUG
-    if(rank == 0) printf("preconditioned Relative Residual: %g\n", relf/rhs_norm);
+    if(rank == 0) printf("Relative Residual: %g\n", relf/rhs_norm);
 #endif
 
         } else {
@@ -102,7 +107,7 @@ void AAR(DS* pAAR,
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relf);
-    if(rank == 0) printf("preconditioned Relative Residual: %g\n", relf/rhs_norm);
+    if(rank == 0) printf("Relative Residual: %g\n", relf/rhs_norm);
 #endif
         }
 
@@ -113,11 +118,11 @@ void AAR(DS* pAAR,
     if(rank  ==  0) {
         if(iter < max_iter && relf  <= tol) {
             printf("AAR preconditioned with Jacobi (AAJ).\n");  
-            printf("AAR converged!:  Iterations = %d, preconditioned Relative Residual = %g, Time = %.4f sec\n", iter-1, relf/rhs_norm, t1-t0); 
+            printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relf/rhs_norm, t1-t0); 
         }
         if(iter>= max_iter) {
             printf("WARNING: AAR exceeded maximum iterations.\n"); 
-            printf("AAR:  Iterations = %d, preconditioned Relative Residual = %g, Time = %.4f sec \n", iter-1, relf/rhs_norm, t1-t0); 
+            printf("AAR:  Iterations = %d, Relative Residual = %g, Time = %.4f sec \n", iter-1, relf/rhs_norm, t1-t0); 
         }
     }
 
@@ -139,13 +144,9 @@ void AAR(DS* pAAR,
     free(allredvec); 
 }
 
-void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, double *f, double beta, int m, int Np, 
+void Galerkin_Richardson(double *x, double *x_old, double **DX, double **DF, double *f, double beta, int m, int Np, 
                             double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec) 
 {
-    // DX and DF are iterate and preconditioned residual history matrices of size Npxm where Np = no. of nodes in proc domain
-    // am_vec is the final update vector of size Npx1
-    // f is the preconditioned residual vector at current iteration of fixed point method
-
     int i, j, k, ctr, cnt; 
     
     // ------------------- First find DF'*DF m x m matrix (local and then AllReduce) ------------------- //
