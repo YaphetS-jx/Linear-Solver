@@ -102,10 +102,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
         VecCopy(res, f_old); 
         VecCopy(Ax, Ax_prev); 
         
-        if (iter == 1)
-            k = m - 1;
-        else
-            k = (iter-2) % m;
+        k = (iter-2+m) % m;
 
         VecAXPY(x, omega, res);                    // x = x + omega * res
         VecWAXPY(DX[k], -1.0, x_old, x);           // DX[k] = x - x_old        
