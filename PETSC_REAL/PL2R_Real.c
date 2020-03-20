@@ -18,7 +18,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     double b_2norm, r_2norm, t0, t1;
     t0 = MPI_Wtime();
 
-    Vec x_old, res, res_local, pres_local, f_old, *DX, *DF, Ax, Ax_prev;
+    Vec x_old, res, res_local, pres_local, *DX, *DF, Ax, Ax_prev;
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6], Np;
@@ -49,7 +49,6 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     // Initialize vectors
     VecDuplicate(x, &x_old); 
     VecDuplicate(x, &res); 
-    VecDuplicate(x, &f_old);
     VecDuplicate(x, &Ax); 
     VecDuplicate(x, &Ax_prev);  
     VecDuplicateVecs(x, m, &DX);                 // storage for delta x
@@ -99,7 +98,6 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 #endif
 
         VecCopy(x, x_old);
-        VecCopy(res, f_old); 
         VecCopy(Ax, Ax_prev); 
         
         k = (iter-2+m) % m;
@@ -175,7 +173,6 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     // deallocate memory
     VecDestroy(&x_old);
     VecDestroy(&res);
-    VecDestroy(&f_old);
     VecDestroy(&res_local);
     VecDestroy(&pres_local);
     VecDestroy(&Ax);
