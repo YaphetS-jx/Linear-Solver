@@ -1,6 +1,6 @@
 /**
- * @file    AAR_Real.h
- * @brief   This file declares functions for Alternating Anderson Richardson solver
+ * @file    PGR.h
+ * @brief   This file declares functions for Periodic Galerkin Richardson solver
  *
  * @author  Xin Jing  < xjing30@gatech.edu>
  *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
@@ -9,18 +9,19 @@
  */
 
 
-#ifndef AAR_H
-#define AAR_H
+#ifndef PGR_H
+#define PGR_H
 
 #include "system.h"
 #include "tools.h"
 
-void AAR(DS_AAR* pAAR, 
-    void (*PoissonResidual)(DS_AAR*, double*, double*, int, int, MPI_Comm),
-    double *x, double *rhs, double omega, double beta, int m, int p, 
-    int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart);
+void PGR(DS* pAAR,
+        void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
+        void (*Precondition)(double, double *, int),
+        double *x, double *rhs, double omega, int m, int p, 
+        int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart);
 
-void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, double *f, double beta_mix, 
-    int m, int N, double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec); 
+void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np, 
+                         double **XtF, double *allredvec, double *Xtf, double *svec);
 
 #endif

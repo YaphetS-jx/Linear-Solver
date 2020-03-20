@@ -19,7 +19,7 @@ void AAR(DS* pAAR,
 {
     int rank, i, col, iter; 
     double *f, *x_old, *f_old, **DX, **DF, *am_vec, t0, t1;
-    double **FtF, *allredvec, *Ftf, *svec, relf, rhs_norm;  
+    double **FtF, *allredvec, *Ftf, *svec, relres, rhs_norm;  
     //////////////////////////////////////////////////////////
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
@@ -50,8 +50,8 @@ void AAR(DS* pAAR,
     assert(am_vec !=  NULL && allredvec != NULL && svec != NULL); 
 
     iter = 1; 
-    relf = tol+1; 
-    // calculate norm of right hand side (required for relative preconditioned residual)
+    relres = tol+1; 
+    
     Vector2Norm(rhs, Np, &rhs_norm); 
     tol *= rhs_norm;
     PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
@@ -59,15 +59,15 @@ void AAR(DS* pAAR,
         f[i] = rhs[i] - f[i];
 
 #ifdef DEBUG
-    Vector2Norm(f, Np, &relf);
-    if(!rank) printf("Relative Residual: %g\n", relf/rhs_norm);
+    Vector2Norm(f, Np, &relres);
+    if(!rank) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif
 
     t0 = MPI_Wtime(); 
 
-    while (relf > tol && iter  <=  max_iter) {
+    while (relres > tol && iter  <=  max_iter) {
         Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);
-        
+
         //----------Store Residual & Iterate History----------//
         if(iter>1) {
             col = ((iter-2) % m); 
@@ -92,10 +92,10 @@ void AAR(DS* pAAR,
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];
 
-            Vector2Norm(f, Np, &relf);
+            Vector2Norm(f, Np, &relres);
 
 #ifdef DEBUG
-    if(rank == 0) printf("Relative Residual: %g\n", relf/rhs_norm);
+    if(rank == 0) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif
 
         } else {
@@ -111,8 +111,8 @@ void AAR(DS* pAAR,
                 f[i] = rhs[i] - f[i];
 
 #ifdef DEBUG
-    Vector2Norm(f, Np, &relf);
-    if(rank == 0) printf("Relative Residual: %g\n", relf/rhs_norm);
+    Vector2Norm(f, Np, &relres);
+    if(rank == 0) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif
         }
 
@@ -121,13 +121,13 @@ void AAR(DS* pAAR,
 
     t1 = MPI_Wtime(); 
     if(rank  ==  0) {
-        if(iter < max_iter && relf  <= tol) {
+        if(iter < max_iter && relres  <= tol) {
             printf("AAR preconditioned with Jacobi (AAJ).\n");  
-            printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relf/rhs_norm, t1-t0); 
+            printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relres/rhs_norm, t1-t0); 
         }
         if(iter>= max_iter) {
             printf("WARNING: AAR exceeded maximum iterations.\n"); 
-            printf("AAR:  Iterations = %d, Relative Residual = %g, Time = %.4f sec \n", iter-1, relf/rhs_norm, t1-t0); 
+            printf("AAR:  Iterations = %d, Relative Residual = %g, Time = %.4f sec \n", iter-1, relres/rhs_norm, t1-t0); 
         }
     }
 

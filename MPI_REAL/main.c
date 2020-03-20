@@ -35,10 +35,8 @@ int main(int argc, char ** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     int Np = aar.np_x * aar.np_y * aar.np_z;
-    AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  // Jacobi Preconditioned AAR 
-    
-    if (rank  ==  0)
-        printf("%.4f\n", aar.coeff_lap[0]);
+    // AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    PGR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.
 

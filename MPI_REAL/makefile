@@ -6,7 +6,7 @@ CFLAGS = -O3 -funroll-loops -g -Wall -DDEBUG
 # CFLAGS = -O3 -funroll-loops -g -Wall
 
 # SOURCEC = main.c system.c AAR.c
-OBJSC = main.o system.o AAR.o tools.o
+OBJSC = main.o system.o AAR.o tools.o PGR.o
 
 
 # aar: ${OBJSC} 
