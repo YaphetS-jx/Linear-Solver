@@ -1,6 +1,6 @@
 /**
- * @file    PGR.c
- * @brief   This file contains functions for Periodic Galerkin Richardson solver
+ * @file    PL2R.c
+ * @brief   This file contains functions for Periodic L2_Richardson solver. 
  *
  * @author  Xin Jing  < xjing30@gatech.edu>
  *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
@@ -9,9 +9,9 @@
  */
 
 
-#include "PGR.h"
+#include "PL2R.h"
 
-void PGR(DS* pAAR,
+void PL2R(DS* pAAR,
         void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
         void (*Precondition)(double, double *, int),
         double *x, double *rhs, double omega, int m, int p, 
@@ -19,7 +19,7 @@ void PGR(DS* pAAR,
 {
     int rank, i, j, col, iter; 
     double *Ax, *Ax_old, *f, *x_old, *f_old, **DX, **DF, t0, t1;
-    double **XtF, *allredvec, *Xtf, *svec, relres, rhs_norm;  
+    double **FtF, *allredvec, *Ftf, *svec, relres, rhs_norm;  
     //////////////////////////////////////////////////////////
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
@@ -30,20 +30,20 @@ void PGR(DS* pAAR,
     f = (double*)calloc(Np, sizeof(double));                               // f = inv(M) * res
     x_old = (double*)calloc(Np, sizeof(double));  
     f_old = (double*)calloc(Np, sizeof(double));  
-    Xtf = (double*) calloc(m, sizeof(double));                             // DF'*f 
-    assert(f !=  NULL &&  x_old != NULL && f_old != NULL && Xtf != NULL); 
+    Ftf = (double*) calloc(m, sizeof(double));                             // DF'*f 
+    assert(f !=  NULL &&  x_old != NULL && f_old != NULL && Ftf != NULL); 
 
     // allocate memory to store DX, DF history matrices and DF'*DF
     DX = (double**) calloc(m, sizeof(double*)); 
     DF = (double**) calloc(m, sizeof(double*)); 
-    XtF = (double**) calloc(m, sizeof(double*));
-    assert(DF !=  NULL && DX != NULL && XtF != NULL); 
+    FtF = (double**) calloc(m, sizeof(double*));
+    assert(DF !=  NULL && DX != NULL && FtF != NULL); 
 
     for (i = 0; i < m; i++) {
         DX[i] = (double*)calloc(Np, sizeof(double)); 
         DF[i] = (double*)calloc(Np, sizeof(double)); 
-        XtF[i] = (double*)calloc(m, sizeof(double)); 
-        assert(DX[i] !=  NULL && DF[i] !=  NULL && XtF[i] !=  NULL); 
+        FtF[i] = (double*)calloc(m, sizeof(double)); 
+        assert(DX[i] !=  NULL && DF[i] !=  NULL && FtF[i] !=  NULL); 
     }
     
     allredvec = (double*) calloc(m*m+m, sizeof(double));               
@@ -88,7 +88,7 @@ void PGR(DS* pAAR,
 
         //----------Galerkin Richardson update-----------//
         if(iter % p == 0) {
-            Galerkin_Richardson(DX, DF, f, m, Np, XtF, allredvec, Xtf, svec); 
+            L2_Richardson(DF, f, m, Np, FtF, allredvec, Ftf, svec); 
 
             for (i = 0; i < m; i ++) 
                 for (j = 0; j < Np; j ++){
@@ -121,11 +121,11 @@ void PGR(DS* pAAR,
     t1 = MPI_Wtime(); 
     if(rank  ==  0) {
         if(iter < max_iter && relres  <= tol) {
-            printf("PGR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relres/rhs_norm, t1-t0); 
+            printf("PL2R converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relres/rhs_norm, t1-t0); 
         }
         if(iter>= max_iter) {
-            printf("WARNING: PGR exceeded maximum iterations.\n"); 
-            printf("PGR:  Iterations = %d, Relative Residual = %g, Time = %.4f sec \n", iter-1, relres/rhs_norm, t1-t0); 
+            printf("WARNING: PL2R exceeded maximum iterations.\n"); 
+            printf("PL2R:  Iterations = %d, Relative Residual = %g, Time = %.4f sec \n", iter-1, relres/rhs_norm, t1-t0); 
         }
     }
 
@@ -138,47 +138,48 @@ void PGR(DS* pAAR,
     for (i = 0; i < m; i++) {
       free(DX[i]); 
       free(DF[i]); 
-      free(XtF[i]); 
+      free(FtF[i]); 
     }
     free(DX); 
     free(DF); 
-    free(XtF); 
-    free(Xtf); 
+    free(FtF); 
+    free(Ftf); 
     free(svec); 
     free(allredvec); 
 }
 
 /**
- * @brief   Galerkin Richardson update
+ * @brief   L2_Richardson update
  *
- *          x_new = x_prev + DX * (pinv(DX'*DF)*(DX'*res));
+ *          x_new = x_prev + DX * (pinv(DF'*DF)*(DF'*res));
  */
 
-void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np, 
-                         double **XtF, double *allredvec, double *Xtf, double *svec) 
+void L2_Richardson( double **DF, double *f, int m, int Np, double **FtF, 
+                    double *allredvec, double *Ftf, double *svec) 
 {
     int i, j, k, ctr, cnt; 
     
-    // ------------------- First find DX'*DF m x m matrix (local and then AllReduce) ------------------- //
+    // ------------------- First find DF'*DF m x m matrix (local and then AllReduce) ------------------- //
     double temp_sum; 
 
     for (j = 0; j < m; j++) {
-        for (i = 0; i < m; i++) {
+        for (i = 0; i <= j; i++) {
             temp_sum = 0; 
             for (k = 0; k < Np; k++) {
-                temp_sum = temp_sum + DX[i][k]*DF[j][k]; 
+                temp_sum = temp_sum + DF[i][k]*DF[j][k]; 
             }
             allredvec[j*m + i] = temp_sum; 
+            allredvec[i*m + j] = temp_sum; 
         }
     }
 
     ctr = m * m; 
-    // ------------------- Compute DX'*f ------------------- //
+    // ------------------- Compute DF'*f ------------------- //
 
     for (j = 0; j < m; j++) {
         temp_sum = 0; 
         for (k = 0; k < Np; k++) 
-            temp_sum = temp_sum + DX[j][k]*f[k]; 
+            temp_sum = temp_sum + DF[j][k]*f[k]; 
         allredvec[ctr++] = temp_sum; 
     }
 
@@ -187,13 +188,13 @@ void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np,
     ctr = 0; 
     for (j = 0; j < m; j++) 
         for (i = 0; i < m; i++) 
-            XtF[i][j] = allredvec[ctr++];
+            FtF[i][j] = allredvec[ctr++];
         
     cnt = 0; 
     for (j = 0; j < m; j++) 
-          Xtf[cnt++] = allredvec[ctr++]; 
+          Ftf[cnt++] = allredvec[ctr++]; 
 
-    PseudoInverseTimesVec(XtF, Xtf, svec, m);
+    PseudoInverseTimesVec(FtF, Ftf, svec, m);
 }
 
 

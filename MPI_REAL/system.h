@@ -52,6 +52,8 @@ typedef struct {
     int non_blocking;              /// <  Option that indicates using non-blocking version of MPI command. 1=TRUE or 0=FALSE (for MPI collectives)
     double ***phi;                 /// <  Unknown variable of the linear equation
     double *phi_v;                 /// <  Unknown variable of the linear equation
+    double *phi_v2;                 /// <  Unknown variable of the linear equation
+    double *phi_v3;                 /// <  Unknown variable of the linear equation
     MPI_Comm comm_laplacian;       /// <  Communicator topology for Laplacian
 }DS;
 

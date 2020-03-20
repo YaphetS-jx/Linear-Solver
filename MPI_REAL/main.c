@@ -11,6 +11,8 @@
 
 #include "system.h"
 #include "AAR.h"
+#include "PGR.h"
+#include "PL2R.h"
 #include "tools.h"
 
 int main(int argc, char ** argv) {
@@ -33,10 +35,20 @@ int main(int argc, char ** argv) {
         printf("Time spent in initialization = %.4f seconds. \n", t_end-t_begin); 
     
     MPI_Barrier(MPI_COMM_WORLD);
+    if (!rank) printf("*************************************************************************** \n\n"); 
 
+    if (!rank) printf("AAR starts.\n"); 
     int Np = aar.np_x * aar.np_y * aar.np_z;
-    // AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
-    PGR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    if (!rank) printf("\n*************************************************************************** \n\n"); 
+
+    if (!rank) printf("PGR starts.\n"); 
+    PGR(&aar, PoissonResidual, Precondition, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    if (!rank) printf("\n*************************************************************************** \n\n"); 
+
+    if (!rank) printf("PL2R starts.\n"); 
+    PL2R(&aar, PoissonResidual, Precondition, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.
 
@@ -47,7 +59,7 @@ int main(int argc, char ** argv) {
         time_t current_time = time(NULL); 
         c_time_str = ctime(&current_time);   
         printf("Ending time: %s", c_time_str); 
-        printf("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% \n"); 
+        printf("*************************************************************************** \n \n"); 
     }
     MPI_Barrier(MPI_COMM_WORLD);    
 

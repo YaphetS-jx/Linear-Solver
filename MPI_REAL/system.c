@@ -25,9 +25,9 @@ void CheckInputs(DS* pAAR, int argc, char ** argv)  {
     char temp; 
 
     if (rank  ==  0) {
-        printf("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% \n"); 
-        printf("       Alternating Anderson Richardson (AAR) Linear Solver \n"); 
-        printf("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% \n"); 
+        printf("*************************************************************************** \n"); 
+        printf("                     AAR, PGR and PL2R linear solver\n"); 
+        printf("*************************************************************************** \n"); 
         char* c_time_str; 
         time_t current_time = time(NULL); 
         c_time_str = ctime(&current_time);   
@@ -106,6 +106,8 @@ void Initialize(DS* pAAR) {
     }
 
     pAAR->phi_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
+    pAAR->phi_v2 = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
+    pAAR->phi_v3 = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
     pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
 
       // random RHS -------------------------------
@@ -142,6 +144,8 @@ void Initialize(DS* pAAR) {
     }
 
     convert_to_vector(pAAR->phi, pAAR->phi_v, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
+    convert_to_vector(pAAR->phi, pAAR->phi_v2, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
+    convert_to_vector(pAAR->phi, pAAR->phi_v3, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
     convert_to_vector(pAAR->rhs, pAAR->rhs_v, pAAR->np_x, pAAR->np_y, pAAR->np_z, 0);
 
     Comm_topologies(pAAR);   
@@ -166,8 +170,8 @@ void Read_input(DS* pAAR) {
 
     pAAR->non_blocking = 1;  // allows overlap of communication and computation in some cases
     pAAR->solver_maxiter = 1000; 
-    pAAR->FDn = 1;  // store half order  
-    pAAR->n_int[0] = 8;  pAAR->n_int[1] = 8;  pAAR->n_int[2] = 8; 
+    pAAR->FDn = 6;  // store half order  
+    pAAR->n_int[0] = 48;  pAAR->n_int[1] = 48;  pAAR->n_int[2] = 48; 
 
 
     if (rank  ==  0) {
@@ -177,7 +181,7 @@ void Read_input(DS* pAAR) {
         printf("beta    : %.2f \n", pAAR->beta); 
         printf("m       : %d \n", pAAR->m);  
         printf("p       : %d \n", pAAR->p); 
-        printf("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% \n"); 
+        printf("*************************************************************************** \n"); 
         printf("nprocx = %u, nprocy = %u, nprocz = %u. \n", pAAR->nprocx, pAAR->nprocy, pAAR->nprocz); 
     }
 
@@ -815,6 +819,8 @@ void Deallocate_memory(DS* pAAR)  {
     free(pAAR->phi); 
     free(pAAR->res); 
     free(pAAR->phi_v); 
+    free(pAAR->phi_v2); 
+    free(pAAR->phi_v3); 
     
   // de-allocate comm topologies
     free(pAAR->neighs_lap); 
