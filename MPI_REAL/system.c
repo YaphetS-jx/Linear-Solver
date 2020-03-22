@@ -170,8 +170,8 @@ void Read_input(DS* pAAR) {
 
     pAAR->non_blocking = 1;  // allows overlap of communication and computation in some cases
     pAAR->solver_maxiter = 1000; 
-    pAAR->FDn = 6;  // store half order  
-    pAAR->n_int[0] = 48;  pAAR->n_int[1] = 48;  pAAR->n_int[2] = 48; 
+    pAAR->FDn = 1;  // store half order  
+    pAAR->n_int[0] = 8;  pAAR->n_int[1] = 8;  pAAR->n_int[2] = 8; 
 
 
     if (rank  ==  0) {

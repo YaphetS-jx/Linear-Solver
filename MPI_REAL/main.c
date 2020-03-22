@@ -39,15 +39,15 @@ int main(int argc, char ** argv) {
 
     if (!rank) printf("AAR starts.\n"); 
     int Np = aar.np_x * aar.np_y * aar.np_z;
-    AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    AAR(&aar, PoissonResidual, NULL, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     if (!rank) printf("PGR starts.\n"); 
-    PGR(&aar, PoissonResidual, Precondition, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    PGR(&aar, PoissonResidual, NULL, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     if (!rank) printf("PL2R starts.\n"); 
-    PL2R(&aar, PoissonResidual, Precondition, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    PL2R(&aar, PoissonResidual, NULL, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.

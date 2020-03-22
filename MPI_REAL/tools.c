@@ -32,6 +32,27 @@ void Vector2Norm(double* Vec, int len, double* ResVal)
     *ResVal = res_global; 
 }
 
+
+/**
+ * @brief   vector 2-norm
+ */
+
+void VectorDot(double* Vec1, double* Vec2, int len, double* ResVal) 
+{ 
+    int rank, k; 
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
+
+    double res = 0; 
+    for (k = 0; k < len; k++)
+        res = res + Vec1[k] * Vec2[k]; 
+
+    double res_global; 
+    MPI_Allreduce(&res, &res_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
+
+    *ResVal = res_global; 
+}
+
+
 /**
  * @brief   Pseudo inverse x vector
  *

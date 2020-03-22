@@ -22,5 +22,6 @@ double pythag(double a, double b);
 void SingularValueDecomp(double **a,int m,int n, double *w, double **v);
 void PseudoInverseTimesVec(double **A,double *b,double *x,int m); 
 void Vector2Norm(double* Vec, int len, double* ResVal); 
+void VectorDot(double* Vec1, double* Vec2, int len, double* ResVal);
 
 #endif

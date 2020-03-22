@@ -66,7 +66,8 @@ void AAR(DS* pAAR,
     t0 = MPI_Wtime(); 
 
     while (relres > tol && iter  <=  max_iter) {
-        Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);
+        if (Precondition != NULL)
+            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);
 
         //----------Store Residual & Iterate History----------//
         if(iter>1) {
