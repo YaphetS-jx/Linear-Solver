@@ -15,9 +15,9 @@
 #include "system.h"
 #include "tools.h"
 
-void CG(SPARC_OBJ *pSPARC, 
+void CG(DS* pAAR,
     void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
     void (*Precondition)(double, double *, int),
-    int N, int DMnd, double* x, double *b, double tol, int max_iter, MPI_Comm comm);
+    int DMnd, double* x, double *b, double tol, int max_iter, MPI_Comm comm);
 
 #endif

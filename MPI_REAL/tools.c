@@ -15,21 +15,16 @@
  * @brief   vector 2-norm
  */
 
-void Vector2Norm(double* Vec, int len, double* ResVal) 
+void Vector2Norm(double* Vec, int len, double* ResVal, MPI_Comm comm) 
 { 
-    int rank, k; 
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-
+    int k; 
     double res = 0; 
     for (k = 0; k < len; k++)
         res = res + Vec[k]*Vec[k]; 
 
-    double res_global; 
-    MPI_Allreduce(&res, &res_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
+    MPI_Allreduce(&res, ResVal, 1, MPI_DOUBLE, MPI_SUM, comm); 
 
-    res_global = sqrt(res_global); 
-
-    *ResVal = res_global; 
+    *ResVal = sqrt(*ResVal);
 }
 
 
@@ -37,19 +32,14 @@ void Vector2Norm(double* Vec, int len, double* ResVal)
  * @brief   vector 2-norm
  */
 
-void VectorDot(double* Vec1, double* Vec2, int len, double* ResVal) 
+void VectorDotProduct(double* Vec1, double* Vec2, int len, double* ResVal, MPI_Comm comm) 
 { 
-    int rank, k; 
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-
+    int k; 
     double res = 0; 
     for (k = 0; k < len; k++)
         res = res + Vec1[k] * Vec2[k]; 
 
-    double res_global; 
-    MPI_Allreduce(&res, &res_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
-
-    *ResVal = res_global; 
+    MPI_Allreduce(&res, ResVal, 1, MPI_DOUBLE, MPI_SUM, comm); 
 }
 
 

@@ -15,7 +15,7 @@ void AAR(DS* pAAR,
         void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
         void (*Precondition)(double, double *, int),
         double *x, double *rhs, double omega, double beta, int m, int p, 
-        int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart) 
+        int max_iter, double tol, int Np, MPI_Comm comm) 
 {
     int rank, i, col, iter; 
     double *f, *x_old, *f_old, **DX, **DF, *am_vec, t0, t1;
@@ -52,14 +52,14 @@ void AAR(DS* pAAR,
     iter = 1; 
     relres = tol+1; 
     
-    Vector2Norm(rhs, Np, &rhs_norm); 
+    Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
+    PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - f[i];
 
 #ifdef DEBUG
-    Vector2Norm(f, Np, &relres);
+    Vector2Norm(f, Np, &relres, comm);
     if(!rank) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif
 
@@ -87,13 +87,13 @@ void AAR(DS* pAAR,
         if(iter % p == 0 && iter>1) {
             // x_new = x_prev + beta*f - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*f));
 
-            AndersonExtrapolation(x, x_old, DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec); 
+            AndersonExtrapolation(x, x_old, DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec, comm); 
 
-            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
+            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];
 
-            Vector2Norm(f, Np, &relres);
+            Vector2Norm(f, Np, &relres, comm);
 
 #ifdef DEBUG
     if(rank == 0) printf("Relative Residual: %g\n", relres/rhs_norm);
@@ -106,13 +106,13 @@ void AAR(DS* pAAR,
             for (i = 0; i < Np; i++)
                 x[i] = x_old[i] + omega * f[i];
 
-            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
+            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
             
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];
 
 #ifdef DEBUG
-    Vector2Norm(f, Np, &relres);
+    Vector2Norm(f, Np, &relres, comm);
     if(rank == 0) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif
         }
@@ -157,7 +157,7 @@ void AAR(DS* pAAR,
  */
 
 void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, double *f, double beta, int m, int Np, 
-                            double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec) 
+                            double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec, MPI_Comm comm) 
 {
     int i, j, k, ctr, cnt; 
     
@@ -185,7 +185,7 @@ void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, d
         allredvec[ctr++] = temp_sum; 
     }
 
-    MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
+    MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, comm); 
 
     ctr = 0; 
     for (j = 0; j < m; j++) 

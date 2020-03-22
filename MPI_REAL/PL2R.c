@@ -15,7 +15,7 @@ void PL2R(DS* pAAR,
         void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
         void (*Precondition)(double, double *, int),
         double *x, double *rhs, double omega, int m, int p, 
-        int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart) 
+        int max_iter, double tol, int Np, MPI_Comm comm) 
 {
     int rank, i, j, col, iter; 
     double *Ax, *Ax_old, *f, *x_old, *f_old, **DX, **DF, t0, t1;
@@ -53,14 +53,14 @@ void PL2R(DS* pAAR,
     iter = 1; 
     relres = tol+1; 
     
-    Vector2Norm(rhs, Np, &rhs_norm); 
+    Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
+    PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm); 
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - Ax[i];
 
 #ifdef DEBUG
-    Vector2Norm(f, Np, &relres);
+    Vector2Norm(f, Np, &relres, comm);
     if(!rank) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif
 
@@ -77,7 +77,7 @@ void PL2R(DS* pAAR,
             x[i] += (omega * f[i]);
         }
 
-        PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm_dist_graph_cart); 
+        PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm); 
         for (i = 0; i < Np; i++)
             f[i] = rhs[i] - Ax[i];
 
@@ -89,7 +89,7 @@ void PL2R(DS* pAAR,
 
         //----------Galerkin Richardson update-----------//
         if(iter % p == 0) {
-            L2_Richardson(DF, f, m, Np, FtF, allredvec, Ftf, svec); 
+            L2_Richardson(DF, f, m, Np, FtF, allredvec, Ftf, svec, comm); 
 
             for (i = 0; i < m; i ++) 
                 for (j = 0; j < Np; j ++){
@@ -108,11 +108,11 @@ void PL2R(DS* pAAR,
             f[i] = rhs[i] - Ax[i];
 
         if (iter % p == 0) 
-            Vector2Norm(f, Np, &relres);
+            Vector2Norm(f, Np, &relres, comm);
 
 #ifdef DEBUG
     if (iter % p)
-        Vector2Norm(f, Np, &relres);
+        Vector2Norm(f, Np, &relres, comm);
     if(rank == 0) printf("Relative Residual: %g\n", relres/rhs_norm);
 #endif        
 
@@ -156,7 +156,7 @@ void PL2R(DS* pAAR,
  */
 
 void L2_Richardson( double **DF, double *f, int m, int Np, double **FtF, 
-                    double *allredvec, double *Ftf, double *svec) 
+                    double *allredvec, double *Ftf, double *svec, MPI_Comm comm) 
 {
     int i, j, k, ctr, cnt; 
     
@@ -184,7 +184,7 @@ void L2_Richardson( double **DF, double *f, int m, int Np, double **FtF,
         allredvec[ctr++] = temp_sum; 
     }
 
-    MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
+    MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, comm); 
 
     ctr = 0; 
     for (j = 0; j < m; j++) 

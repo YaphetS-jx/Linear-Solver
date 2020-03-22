@@ -22,6 +22,6 @@ void PGR(DS* pAAR,
         int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart);
 
 void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np, 
-                         double **XtF, double *allredvec, double *Xtf, double *svec);
+                         double **XtF, double *allredvec, double *Xtf, double *svec, MPI_Comm comm);
 
 #endif

@@ -13,6 +13,7 @@
 #include "AAR.h"
 #include "PGR.h"
 #include "PL2R.h"
+#include "CG.h"
 #include "tools.h"
 
 int main(int argc, char ** argv) {
@@ -48,6 +49,10 @@ int main(int argc, char ** argv) {
 
     if (!rank) printf("PL2R starts.\n"); 
     PL2R(&aar, PoissonResidual, NULL, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    if (!rank) printf("\n*************************************************************************** \n\n"); 
+
+    if (!rank) printf("CG starts.\n"); 
+    CG(&aar, PoissonResidual, NULL,  Np, aar.phi_v4, aar.rhs_v, aar.solver_tol, aar.solver_maxiter, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.
