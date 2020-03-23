@@ -116,10 +116,8 @@ void Initialize(DS* pAAR) {
     pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
 
       // random RHS ------------------------------- 
-    // srand(rank); 
-    
     int g_coords[3];
-    printf("rank: %d, coords: %d, %d, %d\n",rank, coords[0], coords[1], coords[2]);
+    // printf("rank: %d, coords: %d, %d, %d\n",rank, coords[0], coords[1], coords[2]);
     double rhs_sum = 0, rhs_sum_global; 
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_y; j++) {
@@ -152,7 +150,7 @@ void Initialize(DS* pAAR) {
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_z; j++) {
             for (i = 0; i < pAAR->np_z; i++) {
-                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = 1/*(2*((double)(rand()) / (double)(RAND_MAX))-1)*/; 
+                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = 1;/*(2*((double)(rand()) / (double)(RAND_MAX))-1)*/
             }
         }
     }
@@ -183,8 +181,8 @@ void Read_input(DS* pAAR) {
 
     pAAR->non_blocking = 1;  // allows overlap of communication and computation in some cases
     pAAR->solver_maxiter = 1000; 
-    pAAR->FDn = 1;  // store half order  
-    pAAR->n_int[0] = 8;  pAAR->n_int[1] = 8;  pAAR->n_int[2] = 8; 
+    pAAR->FDn = 6;  // store half order  
+    pAAR->n_int[0] = 60;  pAAR->n_int[1] = 60;  pAAR->n_int[2] = 60; 
 
 
     if (rank  ==  0) {

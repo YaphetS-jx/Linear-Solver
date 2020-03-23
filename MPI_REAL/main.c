@@ -67,17 +67,20 @@ int main(int argc, char ** argv) {
         dot += aar.rhs_v[i] * aar.rhs_v[i];
     // printf("rank: %d, dot: %g\n", rank, dot);
 
-    for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
-        if(rank==0) printf("%g\n", aar.rhs_v[i]);
+    // for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
+    //     if(rank==0) printf("%g\n", aar.rhs_v[i]);
+
+    // FILE *fp = fopen("rhs.txt", "w");
+    // for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
+    //     fprintf(fp, "%.8f\n", aar.rhs_v[i]);
+    // fclose(fp);
 
 #ifdef DEBUG
     if(rank==0) printf("x_norm: %g, %g, %g, %g\n", x1, x2, x3, x4);
 #endif
-
     double rhs_norm;
     Vector2Norm(aar.rhs_v, aar.np_x*aar.np_y*aar.np_z, &rhs_norm, MPI_COMM_WORLD);
     if(rank==0) printf("rhs_norm: %g\n", rhs_norm);
-
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.
 
