@@ -104,9 +104,9 @@ end
 x = x_prev;
 
 if count-1 == max_iter
-    fprintf('PGR exceeded maximum iterations and converged to a relative residual of %g. \n',relres);
+    fprintf('PL2R exceeded maximum iterations and converged to a relative residual of %g. \n',relres);
 else
-    fprintf('PGR converged to a relative residual of %g in %d iterations.\n',relres,count-1);
+    fprintf('PL2R converged to a relative residual of %g in %d iterations.\n',relres,count-1);
 end
 
 end
