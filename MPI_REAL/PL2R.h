@@ -9,8 +9,8 @@
  */
 
 
-#ifndef PGR_H
-#define PGR_H
+#ifndef PL2R_H
+#define PL2R_H
 
 #include "system.h"
 #include "tools.h"
