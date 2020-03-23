@@ -16,6 +16,6 @@
 void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
 
-void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m);
+void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DXtDF);
 
 #endif

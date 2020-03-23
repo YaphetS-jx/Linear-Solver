@@ -18,7 +18,7 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
 
     system->order = 6; 
     // store half order
-    system->numPoints_x = 100; system->numPoints_y = 100; system->numPoints_z = 100; 
+    system->numPoints_x = 48; system->numPoints_y = 48; system->numPoints_z = 48; 
 
     if (argc < 7) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n"); 

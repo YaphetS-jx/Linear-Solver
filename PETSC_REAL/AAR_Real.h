@@ -17,6 +17,6 @@
 void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
 
-void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m);
+void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFtDF);
 
 #endif
