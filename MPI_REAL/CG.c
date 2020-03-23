@@ -21,10 +21,10 @@ void CG(DS* pAAR,
     if (comm == MPI_COMM_NULL) return;
 
     int iter_count = 0, rank, size, i;
-    double *r, *d, *s, *q, delta_new, delta_old, alpha, beta, err, b_2norm;
+    double *r, *d, *s, *q, delta_new, delta_old, alpha, beta, relres, b_2norm;
 
     /////////////////////////////////////////////////
-    double t1, t2, tt1, tt2, tt, t;
+    double t1, t2, tt1, tt2, tt, t, ttt0, ttt1;
     /////////////////////////////////////////////////
 
     tt = 0;
@@ -64,19 +64,19 @@ void CG(DS* pAAR,
     t1 = MPI_Wtime();
 
     VectorDotProduct(r, d, DMnd, &delta_new, comm);
-// if (rank == 0) printf("2-norm of RHS = %.13f, which took %.3f ms\n", b_2norm, t*1e3);
 
     if (Precondition != NULL)
-        Vector2Norm(r, DMnd, &err, comm);
+        Vector2Norm(r, DMnd, &relres, comm);
     else
-        err = sqrt(delta_new);
+        relres = sqrt(delta_new);
 
     t2 = MPI_Wtime();
     t += t2 - t1;
 
     tol *= b_2norm;
+    ttt0 = MPI_Wtime();
 
-    while(iter_count < max_iter && err > tol){
+    while(iter_count < max_iter && relres > tol){
         tt1 = MPI_Wtime();
 
         PoissonResidual(pAAR, d, q, pAAR->np_x, pAAR->FDn, comm);
@@ -123,12 +123,12 @@ void CG(DS* pAAR,
         VectorDotProduct(r, s, DMnd, &delta_new, comm);
 
         if (Precondition != NULL)
-            Vector2Norm(r, DMnd, &err, comm);
+            Vector2Norm(r, DMnd, &relres, comm);
         else
-            err = sqrt(delta_new);
+            relres = sqrt(delta_new);
 
 #ifdef DEBUG
-    if (rank == 0) printf("norm of res: %g\n", err);
+    if (rank == 0) printf("norm of res: %g\n", relres);
 #endif
 
         t2 = MPI_Wtime();
@@ -141,8 +141,19 @@ void CG(DS* pAAR,
         iter_count++;
     }
 
+    ttt1 = MPI_Wtime();
+
+    if(rank  ==  0) {
+        if(iter_count < max_iter && relres <= tol) {
+            printf("CG converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter_count, relres/b_2norm, ttt1-ttt0); 
+        }
+        if(iter_count >= max_iter) {
+            printf("WARNING: CG exceeded maximum iterations.\n"); 
+            printf("CG:  Iterations = %d, Relative Residual = %g, Time = %.4f sec \n", iter_count, relres/b_2norm, ttt1-ttt0); 
+        }
+    }
+
 #ifdef DEBUG
-    if (rank == 0) printf("\niter_count = %d, r_2norm = %.3e, tol = %.3e\n\n", iter_count, err/b_2norm, tol);    
     if (rank == 0) printf("Dot product and 2norm took %.3f ms, Ax took %.3f ms\n", t * 1e3, tt * 1e3);
 #endif
 

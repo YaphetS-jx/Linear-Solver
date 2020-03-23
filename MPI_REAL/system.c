@@ -70,6 +70,10 @@ void Initialize(DS* pAAR) {
     /// Initialize quantities.
     Processor_domain(pAAR); 
 
+    int coords[3];
+    Comm_topologies(pAAR, coords);   
+    Laplacian_Comm_Indices(pAAR);  // compute communication indices information for Laplacian     
+
     // allocate memory to store phi(x) in domain 
     pAAR->phi = (double***) calloc((pAAR->np_z+2*pAAR->FDn), sizeof(double**));  
     assert(pAAR->phi !=  NULL); 
@@ -111,13 +115,21 @@ void Initialize(DS* pAAR) {
     pAAR->phi_v4 = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
     pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
 
-      // random RHS -------------------------------
-    srand(rank);   
+      // random RHS ------------------------------- 
+    // srand(rank); 
+    
+    int g_coords[3];
+    printf("rank: %d, coords: %d, %d, %d\n",rank, coords[0], coords[1], coords[2]);
     double rhs_sum = 0, rhs_sum_global; 
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_y; j++) {
             for (i = 0; i < pAAR->np_x; i++) {
-                pAAR->rhs[k][j][i] = (2*((double)(rand()) / (double)(RAND_MAX))-1); 
+                g_coords[0] = coords[0] * pAAR->np_z + k;
+                g_coords[1] = coords[1] * pAAR->np_y + j;
+                g_coords[2] = coords[2] * pAAR->np_x + i;
+                int gidx = g_coords[0] * pAAR->n_int[0] * pAAR->n_int[1] + g_coords[1] * pAAR->n_int[0] + g_coords[2];
+                srand(gidx+1); 
+                pAAR->rhs[k][j][i] = (double)(rand()) / (double)(RAND_MAX); 
                 rhs_sum+= pAAR->rhs[k][j][i]; 
             }
         }
@@ -133,6 +145,7 @@ void Initialize(DS* pAAR) {
             }
         }
     }
+
     // ---------------------------------------------
 
     srand(rank+pAAR->nproc);  
@@ -149,9 +162,7 @@ void Initialize(DS* pAAR) {
     convert_to_vector(pAAR->phi, pAAR->phi_v3, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
     convert_to_vector(pAAR->phi, pAAR->phi_v4, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
     convert_to_vector(pAAR->rhs, pAAR->rhs_v, pAAR->np_x, pAAR->np_y, pAAR->np_z, 0);
-
-    Comm_topologies(pAAR);   
-    Laplacian_Comm_Indices(pAAR);  // compute communication indices information for Laplacian     
+        
 }
 
 void Read_input(DS* pAAR) {
@@ -172,8 +183,8 @@ void Read_input(DS* pAAR) {
 
     pAAR->non_blocking = 1;  // allows overlap of communication and computation in some cases
     pAAR->solver_maxiter = 1000; 
-    pAAR->FDn = 6;  // store half order  
-    pAAR->n_int[0] = 60;  pAAR->n_int[1] = 60;  pAAR->n_int[2] = 60; 
+    pAAR->FDn = 1;  // store half order  
+    pAAR->n_int[0] = 8;  pAAR->n_int[1] = 8;  pAAR->n_int[2] = 8; 
 
 
     if (rank  ==  0) {
@@ -255,7 +266,7 @@ void Processor_domain(DS* pAAR) {
 
 
 // function to create communicator topologies
-void Comm_topologies(DS* pAAR) {
+void Comm_topologies(DS* pAAR, int *pcoords) {
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     int reorder = 0, j; 
@@ -264,7 +275,6 @@ void Comm_topologies(DS* pAAR) {
     MPI_Comm topocomm;  // declare a new communicator to give topology attribute
     MPI_Cart_create(MPI_COMM_WORLD, 3, pdims, periodicity, reorder, &topocomm);  // create Cartesian topology
 
-    int pcoords[3]; 
     MPI_Cart_coords(topocomm, rank, 3, pcoords);  // local coordinate indices of processors
     int rank_chk; 
     MPI_Cart_rank(topocomm, pcoords, &rank_chk);  // proc rank corresponding to coords

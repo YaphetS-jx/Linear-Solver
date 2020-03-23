@@ -123,7 +123,6 @@ void AAR(DS* pAAR,
     t1 = MPI_Wtime(); 
     if(rank  ==  0) {
         if(iter < max_iter && relres  <= tol) {
-            printf("AAR preconditioned with Jacobi (AAJ).\n");  
             printf("AAR converged!:  Iterations = %d, Relative Residual = %g, Time = %.4f sec\n", iter-1, relres/rhs_norm, t1-t0); 
         }
         if(iter>= max_iter) {

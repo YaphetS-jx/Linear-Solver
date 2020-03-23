@@ -62,7 +62,7 @@ void CheckInputs(DS* pAAR,int argc, char ** argv);
 void Initialize(DS* pAAR); 
 void Read_input(DS* pAAR); 
 void Processor_domain(DS* pAAR);
-void Comm_topologies(DS* pAAR);
+void Comm_topologies(DS* pAAR, int *pcoords);
 void Laplacian_Comm_Indices(DS* pAAR); 
 void EdgeIndicesForPoisson(DS* pAAR, int **eout_s,int **eout_e, int **ein_s,int **ein_e, int ereg_s[3][26],
     int ereg_e[3][26],int **stencil_sign,int **edge_ind,int *displs_send,int *displs_recv,int *ncounts_send,int *ncounts_recv);

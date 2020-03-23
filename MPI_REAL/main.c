@@ -34,26 +34,50 @@ int main(int argc, char ** argv) {
     t_end = MPI_Wtime(); 
     if (rank  ==  0)
         printf("Time spent in initialization = %.4f seconds. \n", t_end-t_begin); 
-    
+
     MPI_Barrier(MPI_COMM_WORLD);
     if (!rank) printf("*************************************************************************** \n\n"); 
 
     if (!rank) printf("AAR starts.\n"); 
     int Np = aar.np_x * aar.np_y * aar.np_z;
-    AAR(&aar, PoissonResidual, NULL, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     if (!rank) printf("PGR starts.\n"); 
-    PGR(&aar, PoissonResidual, NULL, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    PGR(&aar, PoissonResidual, Precondition, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     if (!rank) printf("PL2R starts.\n"); 
-    PL2R(&aar, PoissonResidual, NULL, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+    PL2R(&aar, PoissonResidual, Precondition, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
 
     if (!rank) printf("CG starts.\n"); 
     CG(&aar, PoissonResidual, NULL,  Np, aar.phi_v4, aar.rhs_v, aar.solver_tol, aar.solver_maxiter, aar.comm_laplacian);  
     if (!rank) printf("\n*************************************************************************** \n\n"); 
+
+    double x1, x2, x3, x4;
+    Vector2Norm(aar.phi_v, aar.np_x*aar.np_y*aar.np_z, &x1, MPI_COMM_WORLD);
+    Vector2Norm(aar.phi_v2, aar.np_x*aar.np_y*aar.np_z, &x2, MPI_COMM_WORLD);
+    Vector2Norm(aar.phi_v3, aar.np_x*aar.np_y*aar.np_z, &x3, MPI_COMM_WORLD);
+    Vector2Norm(aar.phi_v4, aar.np_x*aar.np_y*aar.np_z, &x4, MPI_COMM_WORLD);
+
+    int i;
+    double dot = 0;
+    for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
+        dot += aar.rhs_v[i] * aar.rhs_v[i];
+    // printf("rank: %d, dot: %g\n", rank, dot);
+
+    for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
+        if(rank==0) printf("%g\n", aar.rhs_v[i]);
+
+#ifdef DEBUG
+    if(rank==0) printf("x_norm: %g, %g, %g, %g\n", x1, x2, x3, x4);
+#endif
+
+    double rhs_norm;
+    Vector2Norm(aar.rhs_v, aar.np_x*aar.np_y*aar.np_z, &rhs_norm, MPI_COMM_WORLD);
+    if(rank==0) printf("rhs_norm: %g\n", rhs_norm);
+
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.
 
