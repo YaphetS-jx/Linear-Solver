@@ -17,7 +17,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 {
     int iter = 1, k, i;
     double b_2norm, r_2norm, *svec; 
-    double t0, t1, t2, t3, ta = 0, tax = 0, tn = 0, tp = 0;
+    double t0, t1, t2, t3, ta = 0, tax = 0, tn = 0, tp = 0, tpre = 0;
 
     t0 = MPI_Wtime();
 
@@ -33,8 +33,8 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     svec = malloc(m * sizeof(double));
-    DFtDF = malloc(m*m * sizeof(PetscScalar));  // DFtDF = DF' * DF
-    MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
+    DFtDF = malloc(m*m * sizeof(PetscScalar));   // DFtDF = DF' * DF
+    MatGetDiagonalBlock(A,&Dblock);              // diagonal block of matrix A
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF,&prec);
@@ -61,6 +61,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDuplicate(res_local, &pres_local);
  
     t2 = MPI_Wtime();
+    tpre = t2 - t0;
 
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
@@ -87,11 +88,9 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
         t2 = MPI_Wtime();
-
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
-        
         t3 = MPI_Wtime();
         tp += (t3 - t2);
 
@@ -109,6 +108,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
              *  Richardson update  *
              ***********************/
             VecAXPY(x, omega, res);             // x = x + omega * res
+
         } else {
             /***********************************
              *  Anderson extrapolation update  *
@@ -131,7 +131,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
         t2 = MPI_Wtime();
 
-        MatMult(A,x,res);                       // res = b- A * x
+        MatMult(A,x,res);                       // res = b - A * x
 
         t3 = MPI_Wtime();
         tax += (t3 - t2);  
@@ -162,11 +162,13 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
     t1=MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by AAR = %.6f seconds.\n",t1-t0);
+    
 #ifdef DEBUG
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by Anderson update = %.6f seconds.\n",ta);
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by precondition = %.6f seconds.\n",tp);
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by norm = %.6f seconds.\n", tn);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by preparation = %.6f seconds.\n", tpre);
 #endif
 
     // deallocate memory
@@ -198,21 +200,21 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, Pe
     assert(svec != NULL && DFtDF != NULL && DFres != NULL);
     /////////////////////////////////////////////////
 
-    for (i=0; i<m; i++)
-        for(j=0; j<i+1; j++)
+    for (i = 0; i < m; i++)
+        for(j = 0; j < i+1; j++)
             VecTDotBegin(DF[i], DF[j], &DFtDF[m*i+j]);          // DFtDF(i,j) = DF[i]' * DF[j]
         
-    for (i=0; i<m; i++)
+    for (i = 0; i < m; i++)
         VecTDotBegin(DF[i], res, &DFres[i]);                    // DFres(i)   = DF[i]' * res
 
-    for (i=0; i<m; i++)
-        for(j=0; j<i+1; j++){
-            VecTDotEnd(DF[i], DF[j], &DFtDF[m*i+j]);            // DFtDF(i,j) = DF[i]' * DF[j]
-            DFtDF[i+m*j] = DFtDF[m*i+j];                        // DFtDF(j,i) = DFtDF(i,j) symmetric 
+    for (i = 0; i < m; i++)
+        for(j = 0; j < i+1; j++){
+            VecTDotEnd(DF[i], DF[j], &DFtDF[m*i+j]);
+            DFtDF[i+m*j] = DFtDF[m*i+j];                        // DFtDF(j,i) = DFtDF(i,j)
         }
         
-    for (i=0; i<m; i++)
-        VecTDotEnd(DF[i], res, &DFres[i]);                      // DFres(i)   = DF[i]' * res
+    for (i = 0; i < m; i++)
+        VecTDotEnd(DF[i], res, &DFres[i]);
 
     // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
     LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DFtDF, m, DFres, m, svec, -1.0, &lprank);

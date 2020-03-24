@@ -1,6 +1,7 @@
 /**
  * @file    PL2R_Real.c
- * @brief   This file contains PL2R_Real solver and its required functions
+ * @brief   This file contains Periodic L2_Richardson solver and its 
+ *          required functions
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -16,7 +17,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 {
     int iter = 1, k, i; 
     double b_2norm, r_2norm, *svec;
-    double t0, t1, t2, t3, ta = 0, tax = 0, tp = 0;
+    double t0, t1, t2, t3, ta = 0, tax = 0, tp = 0, tn = 0, tpre = 0;
     t0 = MPI_Wtime();
 
     Vec x_old, res, res_local, pres_local, *DX, *DF, Ax, Ax_prev;
@@ -59,8 +60,13 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
     VecDuplicate(res_local, &pres_local);
 
+    t2 = MPI_Wtime();
+    tpre = t2 - t0;
+
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
+    t3 = MPI_Wtime();
+    tn += (t3-t2);   
 
     t2 = MPI_Wtime();
     // res = b- A * x
@@ -123,9 +129,13 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
         VecWAXPY(res, -1.0, Ax, b);
 
+        t2 = MPI_Wtime();
         if (iter % p == 0) 
             VecNorm(res, NORM_2, &r_2norm);             
         
+        t3 = MPI_Wtime();
+        tn += (t3-t2);   
+
 #ifdef DEBUG  
     if (iter % p) 
         VecNorm(res, NORM_2, &r_2norm);        
@@ -144,9 +154,11 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     PetscPrintf(PETSC_COMM_WORLD,"Time taken by PL2R = %.6f seconds.\n",t1-t0);
 
 #ifdef DEBUG        
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by L2-Richardson update = %.6f seconds.\n",ta);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by precondition = %.6f seconds.\n",tp);
+    PetscPrintf(PETSC_COMM_WORLD, "Time taken by L2-Richardson update = %.6f seconds.\n",ta);
+    PetscPrintf(PETSC_COMM_WORLD, "Time taken by Matrix Vector Multiply = %.6f seconds.\n",tax);
+    PetscPrintf(PETSC_COMM_WORLD, "Time taken by precondition = %.6f seconds.\n",tp);
+    PetscPrintf(PETSC_COMM_WORLD, "Time taken by norm = %.6f seconds.\n", tn);
+    PetscPrintf(PETSC_COMM_WORLD,"Time taken by preparation = %.6f seconds.\n", tpre);
 #endif 
 
     // deallocate memory

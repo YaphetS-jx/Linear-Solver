@@ -15,7 +15,7 @@
 #include "PL2R_Real.h"
 
 int main( int argc, char **argv ) {
-    int ierr; 
+    int ierr, i; 
     petsc_real system;
     PetscReal t0,t1, t2, t3, rnorm, bnorm;
 
@@ -23,6 +23,7 @@ int main( int argc, char **argv ) {
     KSP ksp;
     PC pc;
     Vec res;
+    FILE *fp;
 
     PetscInitialize(&argc,&argv,(char*)0,help);
 
@@ -40,30 +41,50 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
 
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
-
-    // -------------- AAR solver --------------------------
-    AAR(system.poissonOpr, system.AAR, system.RHS, system.omega, 
-        system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
     
-    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+    fp = fopen("time_AAR.txt", "w");
+    for (i = 0; i < 10; i ++){
+        VecSet(system.AAR, 1.0);
+        t2 = MPI_Wtime();
+        // -------------- AAR solver --------------------------
+        AAR(system.poissonOpr, system.AAR, system.RHS, system.omega, 
+            system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        t3 = MPI_Wtime();
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");   
+        fprintf(fp, "%g\n", t3 - t2);
+    }
+    fclose(fp);
 
-    // -------------- PGR solver --------------------------
-    PGR(system.poissonOpr, system.PGR, system.RHS, system.omega, 
-        system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
-    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+    fp = fopen("time_PGR.txt", "w");
+    for (i = 0; i < 10; i ++){
+        VecSet(system.PGR, 1.0);
+        t2 = MPI_Wtime();
+        // -------------- PGR solver --------------------------
+        PGR(system.poissonOpr, system.PGR, system.RHS, system.omega, 
+            system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+        fprintf(fp, "%g\n", t3 - t2);
+    }
+    fclose(fp);
 
-    // -------------- PL2R solver --------------------------
-    PL2R(system.poissonOpr, system.PL2R, system.RHS, system.omega, 
-        system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
-    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+    fp = fopen("time_PL2R.txt", "w");
+    for (i = 0; i < 10; i ++){
+        VecSet(system.PL2R, 1.0);
+        t2 = MPI_Wtime();
+        // -------------- PL2R solver --------------------------
+        PL2R(system.poissonOpr, system.PL2R, system.RHS, system.omega, 
+            system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+        fprintf(fp, "%g\n", t3 - t2);
+    }
+    fclose(fp);
 
     // VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
-    t2 = MPI_Wtime();
     KSPCreate(PETSC_COMM_WORLD, &ksp);
 
     KSPSetOperators(ksp, system.poissonOpr, system.poissonOpr);
     KSPGetPC(ksp,&pc);
-
+    
     if (system.pc == 1) {
         PCSetType(pc, PCBJACOBI); 
         PetscPrintf(PETSC_COMM_WORLD,"GMRES preconditioned with Block-Jacobi using ILU(0).\n");
@@ -79,47 +100,60 @@ int main( int argc, char **argv ) {
     KSPSetInitialGuessNonzero(ksp, PETSC_TRUE);
     KSPSetFromOptions(ksp);
 
-    KSPSolve(ksp, system.RHS, system.GMRES);
+    fp = fopen("time_GMRES.txt", "w");
+    for (i = 0; i < 10; i ++){
+        VecSet(system.GMRES, 1.0);
+        t2 = MPI_Wtime();
+        
+        KSPSolve(ksp, system.RHS, system.GMRES);
+        
+        t3 = MPI_Wtime();
+        fprintf(fp, "%g\n", t3 - t2);
 
-    t3 = MPI_Wtime();
+        KSPGetIterationNumber(ksp, &iteration);
+        VecDuplicate(system.RHS, &res);
+        MatMult(system.poissonOpr, system.GMRES, res);
+        VecAYPX(res, -1.0, system.RHS);
+        VecNorm(res, NORM_2, &rnorm);
+        VecNorm(system.RHS, NORM_2, &bnorm);
 
-    KSPGetIterationNumber(ksp, &iteration);
-    VecDuplicate(system.RHS, &res);
-    MatMult(system.poissonOpr, system.GMRES, res);
-    VecAYPX(res, -1.0, system.RHS);
-    VecNorm(res, NORM_2, &rnorm);
-    VecNorm(system.RHS, NORM_2, &bnorm);
-
-    
-    PetscPrintf(PETSC_COMM_WORLD,"GMRES converged to a relative residual of %g in %d iterations.\n",rnorm/bnorm, iteration);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by GMRES = %.6f seconds.\n",(t3-t2));
-
-    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+        PetscPrintf(PETSC_COMM_WORLD,"GMRES converged to a relative residual of %g in %d iterations.\n",rnorm/bnorm, iteration);
+        PetscPrintf(PETSC_COMM_WORLD,"Time taken by GMRES = %.6f seconds.\n",(t3-t2));
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+    }
+    fclose(fp);
 
     if (system.pc == 1) 
         PetscPrintf(PETSC_COMM_WORLD,"BICG preconditioned with Block-Jacobi using ILU(0).\n");
     else 
         PetscPrintf(PETSC_COMM_WORLD,"BICG preconditioned with Jacobi.\n");
     
-    t2 = MPI_Wtime();
     KSPSetType(ksp, KSPBICG);
     KSPSetTolerances(ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, 2000);
     KSPSetInitialGuessNonzero(ksp, PETSC_TRUE);
 
-    KSPSolve(ksp, system.RHS, system.BICG);
+    fp = fopen("time_BICG.txt", "w");
+    for (i = 0; i < 10; i ++){
+        VecSet(system.BICG, 1.0);
+        t2 = MPI_Wtime();
 
-    t3 = MPI_Wtime();
+        KSPSolve(ksp, system.RHS, system.BICG);
 
-    KSPGetIterationNumber(ksp, &iteration);
-    MatMult(system.poissonOpr, system.BICG, res);
-    VecAYPX(res, -1.0, system.RHS);
-    VecNorm(res, NORM_2, &rnorm);
-    
-    PetscPrintf(PETSC_COMM_WORLD,"BICG converged to a relative residual of %g in %d iterations.\n",rnorm/bnorm, iteration);
-    PetscPrintf(PETSC_COMM_WORLD,"Time taken by BICG = %.6f seconds.\n",(t3-t2));
-    
+        t3 = MPI_Wtime();
+        fprintf(fp, "%g\n", t3 - t2);
+
+        KSPGetIterationNumber(ksp, &iteration);
+        MatMult(system.poissonOpr, system.BICG, res);
+        VecAYPX(res, -1.0, system.RHS);
+        VecNorm(res, NORM_2, &rnorm);
+        
+        PetscPrintf(PETSC_COMM_WORLD,"BICG converged to a relative residual of %g in %d iterations.\n",rnorm/bnorm, iteration);
+        PetscPrintf(PETSC_COMM_WORLD,"Time taken by BICG = %.6f seconds.\n",(t3-t2));
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");  
+    }
+    fclose(fp);
+
     t1 = MPI_Wtime();
-    PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
 
 #ifdef DEBUG

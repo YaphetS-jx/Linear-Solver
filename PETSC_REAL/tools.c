@@ -18,7 +18,7 @@ void GetLocalVector(DM da, Vec res, Vec *localv, PetscInt *blockinfo, PetscInt N
               lxdim = blockinfo[3], lydim = blockinfo[4], lzdim = blockinfo[5];
     /////////////////////////////////////////////////
 
-    DMDAVecGetArray(da, res, r);                                 // r is the ghosted local vectors of res
+    DMDAVecGetArray(da, res, r);                                    // r is the ghosted local vectors of res
 
     // Extract local values
     t = 0;

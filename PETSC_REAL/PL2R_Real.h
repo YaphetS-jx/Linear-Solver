@@ -14,7 +14,7 @@
 #include "system.h"
 
 void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
-    PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
+          PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
 
 void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFtDF);
 

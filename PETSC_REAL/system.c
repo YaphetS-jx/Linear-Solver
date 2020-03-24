@@ -16,9 +16,10 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscInt p, i; 
     PetscReal Nr, Dr, val; 
 
-    system->order = 6; 
-    // store half order
-    system->numPoints_x = 48; system->numPoints_y = 48; system->numPoints_z = 48; 
+    system->order = 6;                                  // store half order
+    system->numPoints_x = 48;                           // system size in x direction
+    system->numPoints_y = 48;                           // system size in y direction
+    system->numPoints_z = 48;                           // system size in z direction
 
     if (argc < 7) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n"); 
@@ -63,8 +64,7 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscPrintf(PETSC_COMM_WORLD, "***************************************************************************\n"); 
     PetscPrintf(PETSC_COMM_WORLD, "                           INPUT PARAMETERS                                \n"); 
     PetscPrintf(PETSC_COMM_WORLD, "***************************************************************************\n"); 
-
-    //PetscPrintf(PETSC_COMM_WORLD, "FD_ORDER    : %d\n", 2*system->order); 
+    PetscPrintf(PETSC_COMM_WORLD, "FD Order    : %d\n", system->order * 2);
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : AAR\n"); 
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : PGR\n"); 
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : PL2R\n"); 
@@ -110,7 +110,7 @@ void Objects_Create(petsc_real* system) {
     MPI_Comm_size(PETSC_COMM_WORLD, &comm_size); 
 
     PetscErrorCode ieer = DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
-    PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, 1, o, 0, 0, 0, &system->da);        // create a pattern and communication layout
+    PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, 1, o, 0, 0, 0, &system->da);   // create a pattern and communication layout
     DMSetUp(system->da);
     DMDAGetCorners(system->da, &xcor, &ycor, &zcor, &lxdim, &lydim, &lzdim); 
 
@@ -152,20 +152,22 @@ void Objects_Create(petsc_real* system) {
     VecShift(system->RHS, RHSsum); 
 
     // Initial random guess
-    PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
-    PetscRandomSetFromOptions(rnd); 
-    seed=rank;  
-    PetscRandomSetSeed(rnd, seed); 
-    PetscRandomSeed(rnd); 
-
+    // PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
+    // PetscRandomSetFromOptions(rnd); 
+    // seed=rank;  
+    // PetscRandomSetSeed(rnd, seed); 
+    // PetscRandomSeed(rnd); 
     // VecSetRandom(system->AAR, rnd); 
+    // PetscRandomDestroy(&rnd); 
+
+    // Initial all ones guess
     VecSet(system->AAR, 1.0); 
     VecCopy(system->AAR, system->PGR);
     VecCopy(system->AAR, system->PL2R);
     VecCopy(system->AAR, system->GMRES);
     VecCopy(system->AAR, system->BICG);
 
-    PetscRandomDestroy(&rnd); 
+    
 
     if (comm_size == 1 ) {
         DMCreateMatrix(system->da, &system->poissonOpr); 
