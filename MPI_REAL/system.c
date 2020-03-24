@@ -115,9 +115,8 @@ void Initialize(DS* pAAR) {
     pAAR->phi_v4 = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
     pAAR->rhs_v = (double*) calloc(pAAR->np_x * pAAR->np_y * pAAR->np_z, sizeof(double));  
 
-      // random RHS ------------------------------- 
+    // random RHS ------------------------------- 
     int g_coords[3];
-    // printf("rank: %d, coords: %d, %d, %d\n",rank, coords[0], coords[1], coords[2]);
     double rhs_sum = 0, rhs_sum_global; 
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_y; j++) {
@@ -134,12 +133,10 @@ void Initialize(DS* pAAR) {
     }
     MPI_Allreduce(&rhs_sum, &rhs_sum_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD); 
     rhs_sum_global = rhs_sum_global/(pAAR->n_int[0]*pAAR->n_int[1]*pAAR->n_int[2]); 
-      //rhs_sum = 0; 
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_y; j++) {
             for (i = 0; i < pAAR->np_x; i++) {
                 pAAR->rhs[k][j][i] = pAAR->rhs[k][j][i]-rhs_sum_global;  
-                //rhs_sum+= pAAR->rhs[k][j][i]; 
             }
         }
     }
@@ -150,7 +147,7 @@ void Initialize(DS* pAAR) {
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_z; j++) {
             for (i = 0; i < pAAR->np_z; i++) {
-                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = 1;/*(2*((double)(rand()) / (double)(RAND_MAX))-1)*/
+                pAAR->phi[k+pAAR->FDn][j+pAAR->FDn][i+pAAR->FDn] = 1;
             }
         }
     }
@@ -202,11 +199,11 @@ void Read_input(DS* pAAR) {
     for (p = 1;  p <= pAAR->FDn;  p++)
         pAAR->coeff_lap[0]+=  -(2.0/(p*p)); 
 
-    for (p = 1;  p <= pAAR->FDn;  p++) {
+    for (p = 1; p <= pAAR->FDn; p++) {
         Nr = 1; Dr = 1; 
-        for (i = pAAR->FDn-p+1;  i <= pAAR->FDn;  i++)
+        for (i = pAAR->FDn-p+1; i <= pAAR->FDn;  i++)
             Nr*= i; 
-        for (i = pAAR->FDn+1;  i <= pAAR->FDn+p;  i++)
+        for (i = pAAR->FDn+1; i <= pAAR->FDn+p;  i++)
             Dr*= i; 
         val = Nr/Dr; 
         pAAR->coeff_lap[p] = (2*pow(-1, p+1)*val/(p*p));  

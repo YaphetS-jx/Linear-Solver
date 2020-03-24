@@ -5,7 +5,7 @@
 | 
 | Authors: Xin Jing, Phanish Suryanarayana
 |
-| Last Modified: 19 March 2020
+| Last Modified: 24 March 2020
 |-------------------------------------------------------------------------------------------*/
 
 
@@ -19,13 +19,14 @@
 int main(int argc, char ** argv) {
     DS aar = {};   
 
-    int rank, psize; 
+    int rank, psize, i, j; 
+    FILE * fp;
     MPI_Init(&argc, &argv); 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     MPI_Comm_size(MPI_COMM_WORLD, &psize); 
     aar.nproc = psize;  // no. of processors
 
-    double t_begin, t_end; 
+    double t_begin, t_end, t0, t1; 
     t_begin = MPI_Wtime(); 
 
     CheckInputs(&aar, argc, argv); 
@@ -37,50 +38,67 @@ int main(int argc, char ** argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (!rank) printf("*************************************************************************** \n\n"); 
-
-    if (!rank) printf("AAR starts.\n"); 
     int Np = aar.np_x * aar.np_y * aar.np_z;
-    AAR(&aar, PoissonResidual, NULL, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
-    if (!rank) printf("\n*************************************************************************** \n\n"); 
 
-    if (!rank) printf("PGR starts.\n"); 
-    PGR(&aar, PoissonResidual, NULL, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
-    if (!rank) printf("\n*************************************************************************** \n\n"); 
 
-    if (!rank) printf("PL2R starts.\n"); 
-    PL2R(&aar, PoissonResidual, NULL, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
-    if (!rank) printf("\n*************************************************************************** \n\n"); 
+    fp = fopen("time_AAR.txt", "w");
+    for (j = 1; j < 10; j++){
+        for (i = 0; i < Np; i ++)
+            aar.phi_v[i] = 1;
 
-    if (!rank) printf("CG starts.\n"); 
-    CG(&aar, PoissonResidual, NULL,  Np, aar.phi_v4, aar.rhs_v, aar.solver_tol, aar.solver_maxiter, aar.comm_laplacian);  
-    if (!rank) printf("\n*************************************************************************** \n\n"); 
+        if (!rank) printf("AAR starts.\n"); 
+        t0 = MPI_Wtime();
+        AAR(&aar, PoissonResidual, Precondition, aar.phi_v, aar.rhs_v, aar.omega, aar.beta, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+        t1 = MPI_Wtime();
+        if (!rank) printf("\n*************************************************************************** \n\n"); 
+        fprintf(fp, "%g\n", t1 - t0);
+    }
+    fclose(fp);
+    
+    fp = fopen("time_PGR.txt", "w");
+    for (j = 1; j < 10; j++){
+        for (i = 0; i < Np; i ++)
+            aar.phi_v2[i] = 1;
 
-    double x1, x2, x3, x4;
-    Vector2Norm(aar.phi_v, aar.np_x*aar.np_y*aar.np_z, &x1, MPI_COMM_WORLD);
-    Vector2Norm(aar.phi_v2, aar.np_x*aar.np_y*aar.np_z, &x2, MPI_COMM_WORLD);
-    Vector2Norm(aar.phi_v3, aar.np_x*aar.np_y*aar.np_z, &x3, MPI_COMM_WORLD);
-    Vector2Norm(aar.phi_v4, aar.np_x*aar.np_y*aar.np_z, &x4, MPI_COMM_WORLD);
+        if (!rank) printf("PGR starts.\n"); 
+        t0 = MPI_Wtime();
+        PGR(&aar, PoissonResidual, Precondition, aar.phi_v2, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+        t1 = MPI_Wtime();
+        if (!rank) printf("\n*************************************************************************** \n\n"); 
+        fprintf(fp, "%g\n", t1 - t0);
+    }
+    fclose(fp);
 
-    int i;
-    double dot = 0;
-    for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
-        dot += aar.rhs_v[i] * aar.rhs_v[i];
-    // printf("rank: %d, dot: %g\n", rank, dot);
 
-    // for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
-    //     if(rank==0) printf("%g\n", aar.rhs_v[i]);
+    fp = fopen("time_PL2R.txt", "w");
+    for (j = 1; j < 10; j++){
+        for (i = 0; i < Np; i ++)
+            aar.phi_v3[i] = 1;
 
-    // FILE *fp = fopen("rhs.txt", "w");
-    // for(i = 0; i< aar.np_x*aar.np_y*aar.np_z; i++)
-    //     fprintf(fp, "%.8f\n", aar.rhs_v[i]);
-    // fclose(fp);
+        if (!rank) printf("PL2R starts.\n"); 
+        t0 = MPI_Wtime();
+        PL2R(&aar, PoissonResidual, Precondition, aar.phi_v3, aar.rhs_v, aar.omega, aar.m, aar.p, aar.solver_maxiter, aar.solver_tol, Np, aar.comm_laplacian);  
+        t1 = MPI_Wtime();
+        if (!rank) printf("\n*************************************************************************** \n\n"); 
+        fprintf(fp, "%g\n", t1 - t0);
+    }
+    fclose(fp);
 
-#ifdef DEBUG
-    if(rank==0) printf("x_norm: %g, %g, %g, %g\n", x1, x2, x3, x4);
-#endif
-    double rhs_norm;
-    Vector2Norm(aar.rhs_v, aar.np_x*aar.np_y*aar.np_z, &rhs_norm, MPI_COMM_WORLD);
-    if(rank==0) printf("rhs_norm: %g\n", rhs_norm);
+
+    fp = fopen("time_CG.txt", "w");
+    for (j = 1; j < 10; j++){
+        for (i = 0; i < Np; i ++)
+            aar.phi_v4[i] = 1;
+
+        if (!rank) printf("CG starts.\n"); 
+        t0 = MPI_Wtime();
+        CG(&aar, PoissonResidual, NULL,  Np, aar.phi_v4, aar.rhs_v, aar.solver_tol, aar.solver_maxiter, aar.comm_laplacian);  
+        t1 = MPI_Wtime();
+        if (!rank) printf("\n*************************************************************************** \n\n"); 
+        fprintf(fp, "%g\n", t1 - t0);
+    }
+    fclose(fp);
+
 
     Deallocate_memory(&aar);   /// <  De-allocate memory.
 

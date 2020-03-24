@@ -27,7 +27,7 @@ void PGR(DS* pAAR,
     // allocate memory to store x(x) in domain
     Ax = (double*)calloc(Np, sizeof(double));  
     Ax_old = (double*)calloc(Np, sizeof(double));  
-    f = (double*)calloc(Np, sizeof(double));                               // f = inv(M) * res
+    f = (double*)calloc(Np, sizeof(double)); 
     x_old = (double*)calloc(Np, sizeof(double));  
     f_old = (double*)calloc(Np, sizeof(double));  
     Xtf = (double*) calloc(m, sizeof(double));                             // DF'*f 
@@ -47,7 +47,7 @@ void PGR(DS* pAAR,
     }
     
     allredvec = (double*) calloc(m*m+m, sizeof(double));               
-    svec = (double*) calloc(m, sizeof(double));                            // singular values 
+    svec = (double*) calloc(m, sizeof(double));  
     assert(allredvec != NULL && svec != NULL); 
 
     iter = 1; 
@@ -57,7 +57,7 @@ void PGR(DS* pAAR,
     tol *= rhs_norm;
     PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm); 
     for (i = 0; i < Np; i++)
-        f[i] = rhs[i] - Ax[i];
+        f[i] = rhs[i] - Ax[i];                                             // f = rhs - Ax
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relres, comm);
@@ -67,48 +67,49 @@ void PGR(DS* pAAR,
     t0 = MPI_Wtime(); 
 
     while (relres > tol && iter  <=  max_iter) {
+        // Apply precondition here if it is provided by user
         if (Precondition != NULL)
-            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);
+            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);           // Jacobi
 
-        //----------Store Residual & Iterate History----------//
         for (i = 0; i < Np; i++){
-            x_old[i] = x[i];
-            Ax_old[i] = Ax[i];
-            x[i] += (omega * f[i]);
+            x_old[i] = x[i];                                               // x_old = x
+            Ax_old[i] = Ax[i];                                             // Ax_old = Ax
+            x[i] += (omega * f[i]);                                        // x = x + omega * f
         }
 
         PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm); 
         for (i = 0; i < Np; i++)
-            f[i] = rhs[i] - Ax[i];
+            f[i] = rhs[i] - Ax[i];                                         // update f = rhs - Ax
 
         col = (iter-2+m) % m; 
         for (i = 0; i < Np; i++){
-            DX[col][i] = x[i] - x_old[i];
-            DF[col][i] = Ax[i] - Ax_old[i];
+            DX[col][i] = x[i] - x_old[i];                                  // DX[col] = x - x_old
+            DF[col][i] = Ax[i] - Ax_old[i];                                // DF[col] = Ax - Ax_old
         }
 
-        //----------Galerkin Richardson update-----------//
         if(iter % p == 0) {
+            /*************************
+             *  Galerkin-Richardson  *
+             *************************/
             Galerkin_Richardson(DX, DF, f, m, Np, XtF, allredvec, Xtf, svec, comm); 
 
             for (i = 0; i < m; i ++) 
                 for (j = 0; j < Np; j ++){
-                    x[j] = x[j] + DX[i][j] * svec[i];
-                    Ax[j] = Ax[j] + DF[i][j] * svec[i];
+                    x[j] = x[j] + DX[i][j] * svec[i];                      // x = x + DX' * svec
+                    Ax[j] = Ax[j] + DF[i][j] * svec[i];                    // Ax = Ax + DF' * svec
                 }
 
-            // update DX[k] and DF[k]
             for (i = 0; i < Np; i++){
-                DX[col][i] = x[i] - x_old[i];
-                DF[col][i] = Ax[i] - Ax_old[i];
+                DX[col][i] = x[i] - x_old[i];                              // update DX[col]
+                DF[col][i] = Ax[i] - Ax_old[i];                            // update DF[col]
             }
         } 
 
         for (i = 0; i < Np; i++)
-            f[i] = rhs[i] - Ax[i];
+            f[i] = rhs[i] - Ax[i];                                         // update f = rhs - Ax 
 
         if (iter % p == 0) 
-            Vector2Norm(f, Np, &relres, comm);
+            Vector2Norm(f, Np, &relres, comm);                             // update relative residual every p iteration
 
 #ifdef DEBUG
     if (iter % p)
@@ -130,6 +131,7 @@ void PGR(DS* pAAR,
         }
     }
 
+    // de-allocate memory
     free(Ax);
     free(Ax_old);
     free(f); 
@@ -152,16 +154,15 @@ void PGR(DS* pAAR,
 /**
  * @brief   Galerkin Richardson update
  *
- *          x_new = x_prev + DX * (pinv(DX'*DF)*(DX'*res));
+ *          svec = pinv(DX'*DF)*(DX'*res);
  */
 
 void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np, 
                          double **XtF, double *allredvec, double *Xtf, double *svec, MPI_Comm comm) 
 {
     int i, j, k, ctr, cnt; 
-    
-    // ------------------- First find DX'*DF m x m matrix (local and then AllReduce) ------------------- //
     double temp_sum; 
+    //////////////////////////////////////////////////////////
 
     for (j = 0; j < m; j++) {
         for (i = 0; i < m; i++) {
@@ -169,18 +170,16 @@ void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np,
             for (k = 0; k < Np; k++) {
                 temp_sum = temp_sum + DX[i][k]*DF[j][k]; 
             }
-            allredvec[j*m + i] = temp_sum; 
+            allredvec[j*m + i] = temp_sum;                                 // allredvec(i,j) = DX[i]' * DF[j]
         }
     }
 
     ctr = m * m; 
-    // ------------------- Compute DX'*f ------------------- //
-
     for (j = 0; j < m; j++) {
         temp_sum = 0; 
         for (k = 0; k < Np; k++) 
             temp_sum = temp_sum + DX[j][k]*f[k]; 
-        allredvec[ctr++] = temp_sum; 
+        allredvec[ctr++] = temp_sum;                                       // allredvec(i+m*m) = DF[k]' * f
     }
 
     MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, comm); 
@@ -194,7 +193,7 @@ void Galerkin_Richardson(double **DX, double **DF, double *f, int m, int Np,
     for (j = 0; j < m; j++) 
           Xtf[cnt++] = allredvec[ctr++]; 
 
-    PseudoInverseTimesVec(XtF, Xtf, svec, m);
+    PseudoInverseTimesVec(XtF, Xtf, svec, m);                              // svec = inv(XtF) * Xtf
 }
 
 

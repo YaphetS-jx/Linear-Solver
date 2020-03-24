@@ -22,8 +22,6 @@ void CG(DS* pAAR,
 
     int iter_count = 0, rank, size, i;
     double *r, *d, *s, *q, delta_new, delta_old, alpha, beta, relres, b_2norm;
-
-    /////////////////////////////////////////////////
     double t1, t2, tt1, tt2, tt, t, ttt0, ttt1;
     /////////////////////////////////////////////////
 
@@ -47,28 +45,26 @@ void CG(DS* pAAR,
 #endif
 
     tt1 = MPI_Wtime();
-
     PoissonResidual(pAAR, x, r, pAAR->np_x, pAAR->FDn, comm);
-
     tt2 = MPI_Wtime();
     tt += (tt2 - tt1);
 
     for (i = 0; i < DMnd; ++i){
-        r[i] = b[i] - r[i];
-        d[i] = r[i];
+        r[i] = b[i] - r[i];                                                 // r = b - Ax 
+        d[i] = r[i];                                                        // d = r
     }
 
     if (Precondition != NULL)
-        Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), d, DMnd);
+        Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), d, DMnd);              // Jacobi precondition
 
     t1 = MPI_Wtime();
 
-    VectorDotProduct(r, d, DMnd, &delta_new, comm);
+    VectorDotProduct(r, d, DMnd, &delta_new, comm);                         // delta_new = r' * d
 
     if (Precondition != NULL)
         Vector2Norm(r, DMnd, &relres, comm);
     else
-        relres = sqrt(delta_new);
+        relres = sqrt(delta_new);                                           // relres = norm(r)
 
     t2 = MPI_Wtime();
     t += t2 - t1;
@@ -79,23 +75,22 @@ void CG(DS* pAAR,
     while(iter_count < max_iter && relres > tol){
         tt1 = MPI_Wtime();
 
-        PoissonResidual(pAAR, d, q, pAAR->np_x, pAAR->FDn, comm);
+        PoissonResidual(pAAR, d, q, pAAR->np_x, pAAR->FDn, comm);           // q = A * d
 
         tt2 = MPI_Wtime();
         tt += (tt2 - tt1);
 
         t1 = MPI_Wtime();
-        VectorDotProduct(d, q, DMnd, &alpha, comm);
+        VectorDotProduct(d, q, DMnd, &alpha, comm);                         // alpha = d' * q
         t2 = MPI_Wtime();
         t += t2 - t1;
 
-        alpha = delta_new / alpha;
+        alpha = delta_new / alpha;                                          // alpha = (r' * d)/(d' * q)
 
         for (i = 0; i < DMnd; ++i)
-            x[i] = x[i] + alpha * d[i];
+            x[i] = x[i] + alpha * d[i];                                     // x = x + alpha * d
         
-        // Restart every 50 cycles.
-        if ((iter_count % 50) == 0)
+        if ((iter_count % 50) == 0)                                         // Restart every 50 cycles
         {
             tt1 = MPI_Wtime();
             PoissonResidual(pAAR, x, r, pAAR->np_x, pAAR->FDn, comm);
@@ -103,29 +98,29 @@ void CG(DS* pAAR,
             tt += (tt2 - tt1);
 
             for (i = 0; i < DMnd; ++i){
-                r[i] = b[i] - r[i];
-                s[i] = r[i];
+                r[i] = b[i] - r[i];                                         // r = b - A * x
+                s[i] = r[i];                                                // s = r 
             }
             
         } else {
             for (i = 0; i < DMnd; ++i){
-                r[i] = r[i] - alpha * q[i];
-                s[i] = r[i];
+                r[i] = r[i] - alpha * q[i];                                 // r = r - alpha * q
+                s[i] = r[i];                                                // s = r
             }
         }
 
         if (Precondition != NULL)
-            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), s, DMnd);
+            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), s, DMnd);          // Jacobi precondition
 
         delta_old = delta_new;
 
         t1 = MPI_Wtime();
-        VectorDotProduct(r, s, DMnd, &delta_new, comm);
+        VectorDotProduct(r, s, DMnd, &delta_new, comm);                     // delta_new = r' * s
 
         if (Precondition != NULL)
             Vector2Norm(r, DMnd, &relres, comm);
         else
-            relres = sqrt(delta_new);
+            relres = sqrt(delta_new);                                       // relres = norm(r)
 
 #ifdef DEBUG
     if (rank == 0) printf("norm of res: %g\n", relres);
@@ -136,7 +131,7 @@ void CG(DS* pAAR,
 
         beta = delta_new / delta_old;
         for (i = 0; i < DMnd; ++i)
-            d[i] = s[i] + beta * d[i];
+            d[i] = s[i] + beta * d[i];                                      // d = s + beta * d
 
         iter_count++;
     }

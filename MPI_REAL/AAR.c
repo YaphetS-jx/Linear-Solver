@@ -46,7 +46,7 @@ void AAR(DS* pAAR,
     
     am_vec = (double*)calloc(Np, sizeof(double));  
     allredvec = (double*) calloc(m*m+m, sizeof(double));               
-    svec = (double*) calloc(m, sizeof(double));                            // singular values 
+    svec = (double*) calloc(m, sizeof(double));
     assert(am_vec !=  NULL && allredvec != NULL && svec != NULL); 
 
     iter = 1; 
@@ -56,7 +56,7 @@ void AAR(DS* pAAR,
     tol *= rhs_norm;
     PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
     for (i = 0; i < Np; i++)
-        f[i] = rhs[i] - f[i];
+        f[i] = rhs[i] - f[i];                                              // f = rhs - Ax
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relres, comm);
@@ -66,32 +66,36 @@ void AAR(DS* pAAR,
     t0 = MPI_Wtime(); 
 
     while (relres > tol && iter  <=  max_iter) {
+        // Apply precondition here if it is provided by user
         if (Precondition != NULL)
-            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);
+            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);           // f = inv(M) * f
 
-        //----------Store Residual & Iterate History----------//
         if(iter>1) {
             col = ((iter-2) % m); 
             for (i = 0; i < Np; i++){
-                DX[col][i] = x[i] - x_old[i];
-                DF[col][i] = f[i] - f_old[i];
+                DX[col][i] = x[i] - x_old[i];                              // DX[k] = x - x_old
+                DF[col][i] = f[i] - f_old[i];                              // DF[k] = f - f_old
             }
         } 
 
         for (i = 0; i < Np; i++){
-            x_old[i] = x[i];
-            f_old[i] = f[i];
+            x_old[i] = x[i];                                               // x_old = x
+            f_old[i] = f[i];                                               // f_old = f
         }
 
-        //----------Anderson update-----------//
         if(iter % p == 0 && iter>1) {
-            // x_new = x_prev + beta*f - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*f));
+            /***********************************
+             *  Anderson extrapolation update  *
+             ***********************************/
 
-            AndersonExtrapolation(x, x_old, DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec, comm); 
+            AndersonExtrapolation(DX, DF, f, beta, m, Np, am_vec, FtF, allredvec, Ftf, svec, comm); 
+
+            for (i = 0; i < Np; i ++)
+                x[i] = x_old[i] + beta * f[i] - am_vec[i];                 // x = x_old + beta * f - am_vec
 
             PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
             for (i = 0; i < Np; i++)
-                f[i] = rhs[i] - f[i];
+                f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
 
             Vector2Norm(f, Np, &relres, comm);
 
@@ -100,16 +104,16 @@ void AAR(DS* pAAR,
 #endif
 
         } else {
-            //----------Richardson update-----------//
-            // x = x + omega * f
+            /***********************
+             *  Richardson update  *
+             ***********************/
 
             for (i = 0; i < Np; i++)
-                x[i] = x_old[i] + omega * f[i];
+                x[i] = x_old[i] + omega * f[i];                            // x = x + omega * res
 
-            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
-            
+            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm);    
             for (i = 0; i < Np; i++)
-                f[i] = rhs[i] - f[i];
+                f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
 
 #ifdef DEBUG
     Vector2Norm(f, Np, &relres, comm);
@@ -152,36 +156,34 @@ void AAR(DS* pAAR,
 /**
  * @brief   Anderson update
  *
- *          x_new = x_prev + beta*f - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*f));
+ *          am_vec = (DX + beta*DF)*(pinv(DF'*DF)*(DF'*f));
  */
 
-void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, double *f, double beta, int m, int Np, 
+void AndersonExtrapolation(double **DX, double **DF, double *f, double beta, int m, int Np, 
                             double *am_vec, double **FtF, double *allredvec, double *Ftf, double *svec, MPI_Comm comm) 
 {
     int i, j, k, ctr, cnt; 
-    
-    // ------------------- First find DF'*DF m x m matrix (local and then AllReduce) ------------------- //
     double temp_sum = 0; 
+    /////////////////////////////////////////////////
 
     for (j = 0; j < m; j++) {
         for (i = 0; i  <= j; i++) {
             temp_sum = 0; 
             for (k = 0; k < Np; k++) {
-                temp_sum = temp_sum + DF[i][k]*DF[j][k]; 
+                temp_sum = temp_sum + DF[i][k]*DF[j][k];
             }
-            allredvec[j*m + i] = temp_sum; 
-            allredvec[i*m + j] = temp_sum; 
+            allredvec[j*m + i] = temp_sum;                                 // allredvec(i,j) = DF[i]' * DF[j]
+            allredvec[i*m + j] = temp_sum;                                 // allredvec(j,i) = DF[j]' * DF[i]
         }
     }
 
     ctr = m * m; 
-    // ------------------- Compute DF'*f ------------------- //
 
     for (j = 0; j < m; j++) {
         temp_sum = 0; 
         for (k = 0; k < Np; k++) 
             temp_sum = temp_sum + DF[j][k]*f[k]; 
-        allredvec[ctr++] = temp_sum; 
+        allredvec[ctr++] = temp_sum;                                       // allredvec(i+m*m) = DF[k]' * f
     }
 
     MPI_Allreduce(MPI_IN_PLACE, allredvec, m*m+m, MPI_DOUBLE, MPI_SUM, comm); 
@@ -195,20 +197,14 @@ void AndersonExtrapolation(double *x, double *x_old, double **DX, double **DF, d
     for (j = 0; j < m; j++) 
           Ftf[cnt++] = allredvec[ctr++]; 
 
-    PseudoInverseTimesVec(FtF, Ftf, svec, m);
+    PseudoInverseTimesVec(FtF, Ftf, svec, m);                               // svec = inv(FtF) * Ftf
 
-    // ------------------- Compute Anderson update vector am_vec ------------------- //
     for (k = 0; k < Np; k++) {
         temp_sum = 0; 
         for (j = 0; j < m; j++) {
             temp_sum = temp_sum + (DX[j][k] + beta*DF[j][k])*svec[j]; 
         }
-        am_vec[k] = temp_sum;
-    }
-
-    // ------------------- update x ------------------- //
-    for (i = 0; i < Np; i ++){
-        x[i] = x_old[i] + beta * f[i] - am_vec[i];
+        am_vec[k] = temp_sum;                                               // am_vec[k] = (DX + beta * DF) * svec
     }
 }
 
