@@ -11,6 +11,22 @@
 
 #include "CG.h"
 
+/**
+ * @brief   Conjugate Gradient solver
+ *
+ *          This function is designed to solve linear system Ax = b
+ *          PoissonResidual is for matrix vector multiplication A * x, which could be 
+ *          replaced by any user defined function 
+ *          Precondition is for applying precondition, which could be replaced by any
+ *          user defined precondition function
+ *          DMnd     : no. of elements in this domain
+ *          x        : initial guess and final solution
+ *          b        : right hand side of linear system
+ *          tol      : convergence tolerance
+ *          max_iter : maximum number of iterations
+ *          comm     : MPI communicator
+ */
+
 
 void CG(DS* pAAR,
     void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),

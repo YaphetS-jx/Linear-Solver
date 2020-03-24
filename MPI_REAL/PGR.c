@@ -11,6 +11,25 @@
 
 #include "PGR.h"
 
+/**
+ * @brief   Periodic Galerkin Richardson solver
+ *
+ *          This function is designed to solve linear system Ax = b
+ *          PoissonResidual is for matrix vector multiplication A * x, which could be 
+ *          replaced by any user defined function 
+ *          Precondition is for applying precondition, which could be replaced by any
+ *          user defined precondition function
+ *          x        : initial guess and final solution
+ *          rhs      : right hand side of linear system, i.e. b
+ *          omega    : relaxation parameter (for Richardson update)
+ *          m        : no. of previous iterations to be considered in extrapolation
+ *          p        : Perform Anderson extrapolation at every p th iteration
+ *          max_iter : maximum number of iterations
+ *          tol      : convergence tolerance
+ *          Np       : no. of elements in this domain
+ *          comm     : MPI communicator
+ */
+
 void PGR(DS* pAAR,
         void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
         void (*Precondition)(double, double *, int),
