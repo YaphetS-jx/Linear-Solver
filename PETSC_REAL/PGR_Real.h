@@ -12,6 +12,7 @@
 #define PGR_REAL_H
 
 #include "system.h"
+#include "tools.h"
 
 void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);

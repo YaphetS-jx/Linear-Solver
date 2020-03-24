@@ -10,7 +10,23 @@
  */
 
 #include "AAR_Real.h"
-#include "tools.h"
+
+/**
+ * @brief   Alternating Anderson Richardson solver
+ *
+ *          This function is designed to solve linear system Ax = b
+ *          A        : Matrix A
+ *          x        : initial guess and final solution
+ *          b        : right hand side of linear system
+ *          omega    : relaxation parameter (for Richardson update)
+ *          beta     : extrapolation parameter (for Anderson update)
+ *          m        : no. of previous iterations to be considered in extrapolation, Anderson history
+ *          p        : Perform Anderson extrapolation at every p th iteration
+ *          tol      : convergence tolerance
+ *          max_iter : maximum number of iterations
+ *          pc       : Preconditioner, pc = 0 (Jacobi) or 1 (Block Jacobi)
+ *          da       : PETSC data structure
+ */
 
 void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
@@ -33,19 +49,17 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     svec = malloc(m * sizeof(double));
-    DFtDF = malloc(m*m * sizeof(PetscScalar));   // DFtDF = DF' * DF
-    MatGetDiagonalBlock(A,&Dblock);              // diagonal block of matrix A
+    DFtDF = malloc(m*m * sizeof(PetscScalar));  // DFtDF = DF' * DF
+    MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF,&prec);
     if (pc==1) {
-        PCSetType(prec,PCICC); 
-        //ICC(0), Block-Jacobi
+        PCSetType(prec,PCICC);                  //ICC(0), Block-Jacobi
         PetscPrintf(PETSC_COMM_WORLD,"AAR preconditioned with Block-Jacobi using ICC(0).\n");
     }
     else if (pc==0) {
-        PCSetType(prec,PCJACOBI); 
-        // AAJ
+        PCSetType(prec,PCJACOBI);               // Jacobi
         PetscPrintf(PETSC_COMM_WORLD,"AAR preconditioned with Jacobi (AAJ).\n");
     }
     PCSetOperators(prec,Dblock,Dblock);
@@ -55,8 +69,8 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     VecDuplicate(x, &res); 
     VecDuplicate(x, &f_old); 
     VecDuplicate(x, &DXDF);
-    VecDuplicateVecs(x, m, &DX);                  // storage for delta x
-    VecDuplicateVecs(x, m, &DF);                  // storage for delta residual 
+    VecDuplicateVecs(x, m, &DX);                // storage for delta x
+    VecDuplicateVecs(x, m, &DF);                // storage for delta residual 
     VecCreateSeq(PETSC_COMM_SELF, Np, &res_local);
     VecDuplicate(res_local, &pres_local);
  
@@ -70,14 +84,11 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     tn += (t3-t2);   
 
     t2 = MPI_Wtime();
-
-    // res = b- A * x
     MatMult(A,x,res); 
-
     t3 = MPI_Wtime();
     tax += (t3-t2);   
 
-    VecAYPX(res, -1.0, b);
+    VecAYPX(res, -1.0, b);                      // res = b- A * x
     r_2norm = tol + 1;
 
 #ifdef DEBUG
@@ -96,17 +107,18 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 
         if (iter > 1){
             k = (iter-2) % m;
-            VecWAXPY(DX[k], -1.0, x_old, x);    // DX[k] = x   - x_old
-            VecWAXPY(DF[k], -1.0, f_old, res);  // DF[k] = res - f_old
+            VecWAXPY(DX[k], -1.0, x_old, x);    // DX[k] = x - x_old
+            VecWAXPY(DF[k], -1.0, f_old, res);  // DF[k] = f - f_old
         }
 
         VecCopy(x, x_old);                      // x_old = x
-        VecCopy(res, f_old);                    // f_old = res
+        VecCopy(res, f_old);                    // f_old = f
 
         if (iter % p){
             /***********************
              *  Richardson update  *
              ***********************/
+
             VecAXPY(x, omega, res);             // x = x + omega * res
 
         } else {
@@ -196,8 +208,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFtDF)
 {
     int lprank, i, j;
-    
-    assert(svec != NULL && DFtDF != NULL && DFres != NULL);
     /////////////////////////////////////////////////
 
     for (i = 0; i < m; i++)

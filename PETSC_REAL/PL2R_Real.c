@@ -10,7 +10,22 @@
  */
 
 #include "PL2R_Real.h"
-#include "tools.h"
+
+/**
+ * @brief   Periodic L2 Richardson solver
+ *
+ *          This function is designed to solve linear system Ax = b
+ *          A        : Matrix A
+ *          x        : initial guess and final solution
+ *          b        : right hand side of linear system
+ *          omega    : relaxation parameter (for Richardson update)
+ *          m        : no. of previous iterations to be considered in extrapolation
+ *          p        : Perform Anderson extrapolation at every p th iteration
+ *          tol      : convergence tolerance
+ *          max_iter : maximum number of iterations
+ *          pc       : Preconditioner, pc = 0 (Jacobi) or 1 (Block Jacobi)
+ *          da       : PETSC data structure
+ */
 
 void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 

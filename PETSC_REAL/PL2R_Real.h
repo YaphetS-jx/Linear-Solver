@@ -12,6 +12,7 @@
 #define PL2R_REAL_H
 
 #include "system.h"
+#include "tools.h"
 
 void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
           PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
