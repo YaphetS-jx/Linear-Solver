@@ -41,8 +41,9 @@ int main(int argc, char ** argv) {
     int Np = aar.np_x * aar.np_y * aar.np_z;
 
 
-    fp = fopen("time_AAR.txt", "w");
-    for (j = 1; j < 10; j++){
+    fp = fopen("time.txt", "w");
+
+    for (j = 0; j < 10; j++){
         for (i = 0; i < Np; i ++)
             aar.phi_v[i] = 1;
 
@@ -53,10 +54,8 @@ int main(int argc, char ** argv) {
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         fprintf(fp, "%g\n", t1 - t0);
     }
-    fclose(fp);
     
-    fp = fopen("time_PGR.txt", "w");
-    for (j = 1; j < 10; j++){
+    for (j = 0; j < 10; j++){
         for (i = 0; i < Np; i ++)
             aar.phi_v2[i] = 1;
 
@@ -67,11 +66,8 @@ int main(int argc, char ** argv) {
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         fprintf(fp, "%g\n", t1 - t0);
     }
-    fclose(fp);
 
-
-    fp = fopen("time_PL2R.txt", "w");
-    for (j = 1; j < 10; j++){
+    for (j = 0; j < 10; j++){
         for (i = 0; i < Np; i ++)
             aar.phi_v3[i] = 1;
 
@@ -82,11 +78,8 @@ int main(int argc, char ** argv) {
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         fprintf(fp, "%g\n", t1 - t0);
     }
-    fclose(fp);
 
-
-    fp = fopen("time_CG.txt", "w");
-    for (j = 1; j < 10; j++){
+    for (j = 0; j < 10; j++){
         for (i = 0; i < Np; i ++)
             aar.phi_v4[i] = 1;
 
@@ -97,6 +90,7 @@ int main(int argc, char ** argv) {
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         fprintf(fp, "%g\n", t1 - t0);
     }
+    
     fclose(fp);
 
 
