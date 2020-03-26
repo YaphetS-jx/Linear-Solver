@@ -17,7 +17,7 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     PetscReal Nr, Dr, val; 
 
     system->order = 6;                                  // store half order
-    system->numPoints_x = 48;                           // system size in x direction
+    system->numPoints_x = 384;                           // system size in x direction
     system->numPoints_y = 48;                           // system size in y direction
     system->numPoints_z = 48;                           // system size in z direction
 
