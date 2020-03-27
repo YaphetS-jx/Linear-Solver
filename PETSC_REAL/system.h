@@ -38,7 +38,6 @@ typedef struct {
     PetscInt pc;     
     PetscReal coeffs[MAX_ORDER+1];
 
-    PetscInt solver;
     PetscReal solver_tol;
     PetscInt m;
     PetscInt p;
