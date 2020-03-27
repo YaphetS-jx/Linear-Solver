@@ -54,10 +54,6 @@ typedef struct {
     Vec BICG;
 
     Mat poissonOpr;   
-
-    Vec xkprev;
-    Vec xk;
-    Vec fkprev;  
 }petsc_real;
 
 void Setup_and_Initialize(petsc_real* system, int argc, char **argv);
