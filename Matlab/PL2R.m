@@ -30,7 +30,7 @@ if isempty(max_iter)
     max_iter = 1e5;           % maximum number of iterations
 end
 if isempty(omega)
-    omega = 0.6;               % relaxation parameter
+    omega = 1.0;               % relaxation parameter
 end
 if isempty(m)
     m = 13;                   % Anderson history, no. of previous iterations to be considered in extrapolation
