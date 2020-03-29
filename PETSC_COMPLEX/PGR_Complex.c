@@ -1,6 +1,7 @@
 /**
  * @file    PGR_Complex.c
- * @brief   This file contains PGR_Complex solver and its required functions
+ * @brief   This file contains Periodic Galerkin Richardson solver for 
+ *          complex system and its required functions
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -11,7 +12,7 @@
 #include "PGR_Complex.h"
 
 /**
- * @brief   Periodic Galerkin Richardson solver
+ * @brief   Periodic Galerkin Richardson solver for complex system
  *
  *          This function is designed to solve linear system Ax = b
  *          A        : Matrix A
@@ -44,13 +45,14 @@ void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
     Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
-    DXres = (PetscScalar *) calloc (m , sizeof(PetscScalar));       // DFres = DF' * res
+    DXres = (PetscScalar *) calloc (m , sizeof(PetscScalar));       // DFres = DF^H * res
     svec = malloc(m * sizeof(double));
-    DXHDF = malloc(m*m * sizeof(PetscScalar));                      // DFHDF = DF' * DF
+    DXHDF = malloc(m*m * sizeof(PetscScalar));                      // DFHDF = DF^H * DF
     assert(local != NULL && DXres != NULL && svec != NULL && DXHDF != NULL);
-    MatGetDiagonalBlock(A, &Dblock);                                 // diagonal block of matrix A
+    MatGetDiagonalBlock(A, &Dblock);                                // diagonal block of matrix A
 
-    lapack_complex_double *lapack_DXHDF, *lapack_DXres; // structures to pass complex valued arrays to lapacke_zgelsd
+    // structures to pass complex valued arrays to lapacke_zgelsd
+    lapack_complex_double *lapack_DXHDF, *lapack_DXres; 
     PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DXHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DXres);
 
@@ -131,12 +133,12 @@ void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
              ***********************/
             Galerkin_Richardson(DXres, DX, DF, res, m, svec, DXHDF, lapack_DXHDF, lapack_DXres);
 
-            for (i=0; i<m; i++)                                     // x = x + DX' * DXres
+            for (i=0; i<m; i++)                                     // x = x + DX^H * DXres
                 VecAXPY(x, DXres[i], DX[i]);                       
 
             VecWAXPY(DX[k], -1.0, x_old, x);                        // update DX[k] = x - x_old 
 
-            for (i=0; i<m; i++)                                     // Ax = Ax + DF' * DXres
+            for (i=0; i<m; i++)                                     // Ax = Ax + DF^H * DXres
                 VecAXPY(Ax, DXres[i], DF[i]);
 
             VecWAXPY(DF[k], -1.0, Ax_prev, Ax);                     // update DF[k] = Ax - Ax_prev
@@ -162,7 +164,7 @@ void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
         iter ++;
     }
 
-    if (iter<max_iter) {
+    if (iter < max_iter) {
         PetscPrintf(PETSC_COMM_WORLD,"PGR converged to a relative residual of %g in %d iterations.\n", r_2norm/b_2norm, iter-1);
     } else {
         PetscPrintf(PETSC_COMM_WORLD,"PGR exceeded maximum iterations %d and converged to a relative residual of %g. \n", iter-1, r_2norm/b_2norm);
@@ -200,7 +202,7 @@ void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
 /**
  * @brief   Galerkin update
  *
- *          x_new = x_prev + DX * (pinv(DX'*DF)*(DX'*res));
+ *          x_new = x_prev + DX * (pinv(DX^H*DF)*(DX^H*res));
  */
 
 void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DXHDF,
@@ -230,7 +232,7 @@ void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscIn
         lapack_DXres[i].imag = (double)PetscImaginaryPart(DXres[i]);
     }
 
-    // Least square problem solver. DXres = pinv(DX'*DF)*(DX'*res)
+    // Least square problem solver. DXres = pinv(DX^H*DF)*(DX^H*res)
     info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DXHDF, m, lapack_DXres, m, svec, -1.0, &lprank);
     if(info != 0)
         PetscPrintf(PETSC_COMM_WORLD,"Error in LAPACKE_zgelsd, info=%d \n",info);

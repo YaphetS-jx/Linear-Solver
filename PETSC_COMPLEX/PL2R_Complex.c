@@ -1,7 +1,7 @@
 /**
  * @file    PL2R_Complex.c
- * @brief   This file contains Periodic L2_Richardson complex solver and its 
- *          required functions
+ * @brief   This file contains Periodic L2_Richardson solver for complex 
+ *          system and its required functions.
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -12,7 +12,7 @@
 #include "PL2R_Complex.h"
 
 /**
- * @brief   Periodic L2 Richardson solver
+ * @brief   Periodic L2 Richardson solver for complex system
  *
  *          This function is designed to solve linear system Ax = b
  *          A        : Matrix A
@@ -27,8 +27,8 @@
  *          da       : PETSC data structure
  */
 
-void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
-    PetscInt m, PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da) 
+void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscInt m, 
+    PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da) 
 {
     int iter = 1, k, i; 
     double b_2norm, r_2norm, *svec;
@@ -45,13 +45,14 @@ void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
     Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
-    DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));      // DFres = DF' * res
+    DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));      // DFres = DF^H * res
     svec = malloc(m * sizeof(double));
-    DFHDF = malloc(m*m * sizeof(PetscScalar));  // DFHDF = DF' * DF
+    DFHDF = malloc(m*m * sizeof(PetscScalar));                     // DFHDF = DF^H * DF
     assert(local != NULL && DFres != NULL && svec != NULL && DFHDF != NULL);
-    MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
+    MatGetDiagonalBlock(A,&Dblock);                                // diagonal block of matrix A
 
-    lapack_complex_double *lapack_DFHDF, *lapack_DFres; // structures to pass complex valued arrays to lapacke_zgelsd
+    // structures to pass complex valued arrays to lapacke_zgelsd
+    lapack_complex_double *lapack_DFHDF, *lapack_DFres; 
     PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DFres);
 
@@ -201,7 +202,7 @@ void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 /**
  * @brief   L2_Richardson update
  *
- *          x_new = x_prev + DX * (pinv(DF'*DF)*(DF'*res));
+ *          x_new = x_prev + DX * (pinv(DF^H*DF)*(DF^H*res));
  */
 
 void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFHDF,
@@ -212,15 +213,15 @@ void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *sv
 
     for (i = 0; i < m; i++)
         for(j = 0; j<i+1; j++)
-            VecDotBegin(DF[j], DF[i], &DFHDF[i+m*j]);               // DFHDF(i,j) = DF[i]' * DF[j]
+            VecDotBegin(DF[j], DF[i], &DFHDF[i+m*j]);             // DFHDF(i,j) = DF[i]^H * DF[j]
         
     for (i = 0; i < m; i++)
-        VecDotBegin(res, DF[i], &DFres[i]);                         // DFres(i)   = DF[i]' * res
+        VecDotBegin(res, DF[i], &DFres[i]);                       // DFres(i)   = DF[i]^H * res
 
     for (i = 0; i < m; i++)
         for(j=0; j < i+1; j++){
-            VecDotEnd(DF[j], DF[i], &DFHDF[i+m*j]);               // DFHDF(i,j) = DF[i]' * DF[j]
-            DFHDF[j+m*i] = PetscConjComplex(DFHDF[i+m*j]);        // DFHDF(j,i) = DFHDF(i,j)
+            VecDotEnd(DF[j], DF[i], &DFHDF[i+m*j]);               // DFHDF(i,j) = DF[i]^H * DF[j]
+            DFHDF[j+m*i] = PetscConjComplex(DFHDF[i+m*j]);        // DFHDF(j,i) = conjugate(DFHDF(i,j))
 
             lapack_DFHDF[i+m*j].real = (double)PetscRealPart(DFHDF[i+m*j]);
             lapack_DFHDF[i+m*j].imag = (double)PetscImaginaryPart(DFHDF[i+m*j]);
@@ -235,7 +236,7 @@ void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *sv
         lapack_DFres[i].imag = (double)PetscImaginaryPart(DFres[i]);
     }
 
-    // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
+    // Least square problem solver. DFres = pinv(DF^H*DF)*(DF^H*res)
     info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DFHDF, m, lapack_DFres, m, svec, -1.0, &lprank);
     if(info != 0)
         PetscPrintf(PETSC_COMM_WORLD,"Error in LAPACKE_zgelsd, info=%d \n",info);

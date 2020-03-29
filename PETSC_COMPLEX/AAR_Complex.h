@@ -1,6 +1,7 @@
 /**
  * @file    AAR_Complex.h
- * @brief   This file declares the functions for Alternating Anderson Richardson solver. 
+ * @brief   This file declares the functions for Alternating Anderson 
+ *          Richardson solver for complex system. 
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>

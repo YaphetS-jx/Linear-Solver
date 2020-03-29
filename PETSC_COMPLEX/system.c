@@ -118,53 +118,34 @@ void Objects_Create(petsc_complex* system) {
     VecDuplicate(system->RHS, &system->PGR); 
     VecDuplicate(system->RHS, &system->PL2R);                                
     VecDuplicate(system->RHS, &system->GMRES);                               
-    VecDuplicate(system->RHS, &system->BICG);                                // create Initial by duplicating the pattern of RHS
+    VecDuplicate(system->RHS, &system->BICG);  
+    VecDuplicate(system->RHS, &system->CG);  
+    VecDuplicate(system->RHS, &system->LGMRES);                                // create Initial by duplicating the pattern of RHS
 
     PetscRandom rnd; 
     unsigned long seed; 
     int rank, i, j, k, t = 0; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
-
-    PetscRandomCreate(PETSC_COMM_WORLD,&rnd);
-    PetscRandomSetFromOptions(rnd);
-    seed=0;  
-    PetscRandomSetSeed(rnd,seed);
-    PetscRandomSeed(rnd);
-    VecSetRandom(system->RHS,rnd);  
-    PetscRandomDestroy(&rnd);
-
-    PetscRandomCreate(PETSC_COMM_WORLD,&rnd);
-    PetscRandomSetFromOptions(rnd);
-    seed=1;  
-    PetscRandomSetSeed(rnd,seed);
-    PetscRandomSeed(rnd);
-    VecSetRandom(system->AAR,rnd);
-    PetscRandomDestroy(&rnd);
-
-    double x2norm;
-    VecNorm(system->AAR, NORM_2, &x2norm);
-    PetscPrintf(PETSC_COMM_WORLD,"x norm = %.14f \n",x2norm);
-
     // RHS vector
-    // PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
-    // PetscRandomSetFromOptions(rnd); 
+    PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
+    PetscRandomSetFromOptions(rnd); 
     
-    // // generating RHS independent of number of processors
-    // VecAssemblyBegin(system->RHS);
-    // DMDAVecGetArray(system->da, system->RHS, &r); 
-    // for (k = zcor; k < lzdim+zcor; k++)
-    //     for (j = ycor; j < lydim+ycor; j++)
-    //         for (i = xcor; i < lxdim+xcor; i++){
-    //             gidx = (k)*n_x*n_y + (j)*n_x + (i);
-    //             PetscRandomSetSeed(rnd, gidx + 1);
-    //             PetscRandomSeed(rnd);
-    //             PetscRandomGetValueReal(rnd, &val);
-    //             r[k][j][i] = val;
-    //         }
-    // DMDAVecRestoreArray(system->da, system->RHS, &r);
-    // VecAssemblyEnd(system->RHS);
-    // PetscRandomDestroy(&rnd); 
+    // generating RHS independent of number of processors
+    VecAssemblyBegin(system->RHS);
+    DMDAVecGetArray(system->da, system->RHS, &r); 
+    for (k = zcor; k < lzdim+zcor; k++)
+        for (j = ycor; j < lydim+ycor; j++)
+            for (i = xcor; i < lxdim+xcor; i++){
+                gidx = (k)*n_x*n_y + (j)*n_x + (i);
+                PetscRandomSetSeed(rnd, gidx + 1);
+                PetscRandomSeed(rnd);
+                PetscRandomGetValueReal(rnd, &val);
+                r[k][j][i] = val;
+            }
+    DMDAVecRestoreArray(system->da, system->RHS, &r);
+    VecAssemblyEnd(system->RHS);
+    PetscRandomDestroy(&rnd); 
 
     // Initial all ones guess
     VecSet(system->AAR, 1.0); 
@@ -172,8 +153,8 @@ void Objects_Create(petsc_complex* system) {
     VecCopy(system->AAR, system->PL2R);
     VecCopy(system->AAR, system->GMRES);
     VecCopy(system->AAR, system->BICG);
-
-    
+    VecCopy(system->AAR, system->CG);
+    VecCopy(system->AAR, system->LGMRES);
 
     if (comm_size == 1 ) {
         DMCreateMatrix(system->da, &system->helmholtzOpr); 
@@ -195,6 +176,8 @@ void Objects_Destroy(petsc_complex* system) {
     VecDestroy(&system->PL2R); 
     VecDestroy(&system->GMRES); 
     VecDestroy(&system->BICG); 
+    VecDestroy(&system->CG); 
+    VecDestroy(&system->LGMRES); 
     MatDestroy(&system->helmholtzOpr); 
 
     return; 

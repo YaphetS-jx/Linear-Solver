@@ -1,7 +1,7 @@
 /**
  * @file    AAR_Complex.c
- * @brief   This file contains Alternating Anderson Richardson solver and
- *          its required functions
+ * @brief   This file contains Alternating Anderson Richardson solver 
+ *          for complex system and its required functions.
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -12,7 +12,7 @@
 #include "AAR_Complex.h"
 
 /**
- * @brief   Alternating Anderson Richardson solver
+ * @brief   Alternating Anderson Richardson solver for complex system
  *
  *          This function is designed to solve linear system Ax = b
  *          A        : Matrix A
@@ -49,10 +49,11 @@ void AAR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     svec = malloc(m * sizeof(double));
-    DFHDF = malloc(m*m * sizeof(PetscScalar));  // DFHDF = DF' * DF
+    DFHDF = malloc(m*m * sizeof(PetscScalar));   // DFHDF = DF^H * DF
     MatGetDiagonalBlock(A, &Dblock);             // diagonal block of matrix A
 
-    lapack_complex_double *lapack_DFHDF, *lapack_DFres; // structures to pass complex valued arrays to lapacke_zgelsd
+    // structures to pass complex valued arrays to lapacke_zgelsd
+    lapack_complex_double *lapack_DFHDF, *lapack_DFres; 
     PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DFres);
 
@@ -130,7 +131,7 @@ void AAR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
             t2 = MPI_Wtime();
             Anderson(DFres, DF, res, m, svec, DFHDF, lapack_DFHDF, lapack_DFres);
 
-            for (i=0; i<m; i++){                // x = x - (DX + beta*DF)' * DFres
+            for (i=0; i<m; i++){                // x = x - (DX + beta*DF)^H * DFres
                 VecWAXPY(DXDF, beta, DF[i], DX[i]);
                 VecAXPY(x, -DFres[i], DXDF);                            
             }
@@ -198,7 +199,7 @@ void AAR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
 /**
  * @brief   Anderson update
  *
- *          x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*res));
+ *          x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF^H*DF)*(DF^H*res));
  */
 
 void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFHDF, 
@@ -209,10 +210,10 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, Pe
 
     for (i = 0; i < m; i++)
         for(j = 0; j < i+1; j++)
-            VecDotBegin(DF[j], DF[i], &DFHDF[i+m*j]);          // DFHDF(i,j) = DF[i]' * DF[j]
+            VecDotBegin(DF[j], DF[i], &DFHDF[i+m*j]);          // DFHDF(i,j) = DF[i]^H * DF[j]
         
     for (i = 0; i < m; i++)
-        VecDotBegin(res, DF[i], &DFres[i]);                    // DFres(i)   = DF[i]' * res
+        VecDotBegin(res, DF[i], &DFres[i]);                    // DFres(i)   = DF[i]^H * res
 
     for (i = 0; i < m; i++)
         for(j = 0; j < i+1; j++){
@@ -232,7 +233,7 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, Pe
         lapack_DFres[i].imag = (double)PetscImaginaryPart(DFres[i]);
     }
 
-    // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
+    // Least square problem solver. DFres = pinv(DF^H*DF)*(DF^H*res)
     info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DFHDF, m, lapack_DFres, m, svec, -1.0, &lprank);
     if(info != 0)
         PetscPrintf(PETSC_COMM_WORLD,"Error in LAPACKE_zgelsd, info=%d \n",info);
