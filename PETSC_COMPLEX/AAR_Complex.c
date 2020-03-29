@@ -97,7 +97,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     PetscPrintf(PETSC_COMM_WORLD,"relres: %lf\n", r_2norm/b_2norm);
 #endif
 
-
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
         t2 = MPI_Wtime();
@@ -120,16 +119,13 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
             /***********************
              *  Richardson update  *
              ***********************/
-
             VecAXPY(x, omega, res);             // x = x + omega * res
 
         } else {
             /***********************************
              *  Anderson extrapolation update  *
              ***********************************/
-            
             t2 = MPI_Wtime();
-
             Anderson(DFres, DF, res, m, svec, DFtDF, lapack_DFtDF, lapack_DFres);
 
             for (i=0; i<m; i++){                // x = x - (DX + beta*DF)' * DFres
@@ -138,7 +134,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
             }
 
             VecAXPY(x, beta, res);              // x = x + beta * res
-
             t3 = MPI_Wtime();
             ta += (t3 - t2);
         }
@@ -152,7 +147,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
         t2 = MPI_Wtime();
         if (iter % p == 0)
             VecNorm(res, NORM_2, &r_2norm);
-            
         t3 = MPI_Wtime();
         tn += (t3 - t2); 
 
@@ -222,13 +216,6 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, Pe
         for(j = 0; j < i+1; j++){
             VecDotEnd(DF[j], DF[i], &DFtDF[i+m*j]);
             DFtDF[j+m*i] = PetscConjComplex(DFtDF[i+m*j]);     // DFtDF(j,i) = DFtDF(i,j)
-        }
-        
-    for (i = 0; i < m; i++)
-        VecDotEnd(res, DF[i], &DFres[i]);
-
-    for (i = 0; i < m; i++)
-        for(j = 0; j < i+1; j++){
 
             lapack_DFtDF[i+m*j].real = (double)PetscRealPart(DFtDF[i+m*j]);
             lapack_DFtDF[i+m*j].imag = (double)PetscImaginaryPart(DFtDF[i+m*j]);
@@ -236,8 +223,9 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, Pe
             lapack_DFtDF[j+m*i].real = lapack_DFtDF[i+m*j].real;
             lapack_DFtDF[j+m*i].imag = -lapack_DFtDF[i+m*j].imag; 
         }
-
+        
     for (i = 0; i < m; i++){
+        VecDotEnd(res, DF[i], &DFres[i]);
         lapack_DFres[i].real = (double)PetscRealPart(DFres[i]);
         lapack_DFres[i].imag = (double)PetscImaginaryPart(DFres[i]);
     }
