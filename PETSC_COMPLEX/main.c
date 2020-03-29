@@ -47,7 +47,7 @@ int main( int argc, char **argv ) {
         VecSet(system.AAR, 1.0);
         t2 = MPI_Wtime();
         // -------------- AAR solver --------------------------
-        AAR(system.helmholtzOpr, system.AAR, system.RHS, system.omega, 
+        AAR_Complex(system.helmholtzOpr, system.AAR, system.RHS, system.omega, 
             system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
         t3 = MPI_Wtime();
         PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");   
@@ -55,28 +55,28 @@ int main( int argc, char **argv ) {
     }
 
 
-    // for (i = 0; i < 50; i ++){
-    //     VecSet(system.PGR, 1.0);
-    //     t2 = MPI_Wtime();
-    //     // -------------- PGR solver --------------------------
-    //     PGR(system.helmholtzOpr, system.PGR, system.RHS, system.omega, 
-    //         system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
-    //     t3 = MPI_Wtime();
-    //     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
-    //     fprintf(fp, "%g\n", t3 - t2);
-    // }
+    for (i = 0; i < 1; i ++){
+        VecSet(system.PGR, 1.0);
+        t2 = MPI_Wtime();
+        // -------------- PGR solver --------------------------
+        PGR_Complex(system.helmholtzOpr, system.PGR, system.RHS, system.omega, 
+            system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        t3 = MPI_Wtime();
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+        fprintf(fp, "%g\n", t3 - t2);
+    }
 
 
-    // for (i = 0; i < 50; i ++){
-    //     VecSet(system.PL2R, 1.0);
-    //     t2 = MPI_Wtime();
-    //     // -------------- PL2R solver --------------------------
-    //     PL2R(system.helmholtzOpr, system.PL2R, system.RHS, system.omega, 
-    //         system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
-    //     t3 = MPI_Wtime();
-    //     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
-    //     fprintf(fp, "%g\n", t3 - t2);
-    // }
+    for (i = 0; i < 1; i ++){
+        VecSet(system.PL2R, 1.0);
+        t2 = MPI_Wtime();
+        // -------------- PL2R solver --------------------------
+        PL2R_Complex(system.helmholtzOpr, system.PL2R, system.RHS, system.omega, 
+            system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
+        t3 = MPI_Wtime();
+        PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
+        fprintf(fp, "%g\n", t3 - t2);
+    }
 
 
     // // VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
@@ -192,15 +192,15 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"Total wall time = %.4f seconds.\n\n",t1-t0);
 
 #ifdef DEBUG
-    // double A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm;
-    // MatNorm(system.helmholtzOpr, NORM_FROBENIUS, &A_norm);
-    // VecNorm(system.RHS, NORM_2, &b_norm);
-    // VecNorm(system.AAR, NORM_2, &x1_norm);
-    // VecNorm(system.PGR, NORM_2, &x2_norm);
-    // VecNorm(system.PL2R, NORM_2, &x3_norm);
+    double A_norm, b_norm, x1_norm, x2_norm, x3_norm = 0, x4_norm = 0, x5_norm = 0;
+    MatNorm(system.helmholtzOpr, NORM_FROBENIUS, &A_norm);
+    VecNorm(system.RHS, NORM_2, &b_norm);
+    VecNorm(system.AAR, NORM_2, &x1_norm);
+    VecNorm(system.PGR, NORM_2, &x2_norm);
+    VecNorm(system.PL2R, NORM_2, &x3_norm);
     // VecNorm(system.GMRES, NORM_2, &x4_norm);
     // VecNorm(system.BICG, NORM_2, &x5_norm);
-    // PetscPrintf(PETSC_COMM_WORLD,"Norm A: %g, b: %g, x1: %g, x2: %g, x3: %g, x4: %g, x5: %g\n",A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm);
+    PetscPrintf(PETSC_COMM_WORLD,"Norm A: %g, b: %g, x1: %g, x2: %g, x3: %g, x4: %g, x5: %g\n",A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm);
 #endif
     
     // VecDestroy(&res);

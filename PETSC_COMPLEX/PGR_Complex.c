@@ -26,8 +26,8 @@
  *          da       : PETSC data structure
  */
 
-void PGR(Mat A, Vec x, Vec b, PetscScalar omega, 
-    PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
+void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, 
+    PetscInt m, PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da) 
 {
     int iter = 1, k, i; 
     double b_2norm, r_2norm, *svec;
@@ -38,7 +38,7 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6], Np;
-    PetscScalar *local, * DXres, ***r, *DXtDF;
+    PetscScalar *local, * DXres, ***r, *DXHDF;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
@@ -46,17 +46,21 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
     DXres = (PetscScalar *) calloc (m , sizeof(PetscScalar));       // DFres = DF' * res
     svec = malloc(m * sizeof(double));
-    DXtDF = malloc(m*m * sizeof(PetscScalar));                      // DFtDF = DF' * DF
-    assert(local != NULL && DXres != NULL && svec != NULL && DXtDF != NULL);
-    MatGetDiagonalBlock(A,&Dblock);                                 // diagonal block of matrix A
+    DXHDF = malloc(m*m * sizeof(PetscScalar));                      // DFHDF = DF' * DF
+    assert(local != NULL && DXres != NULL && svec != NULL && DXHDF != NULL);
+    MatGetDiagonalBlock(A, &Dblock);                                 // diagonal block of matrix A
+
+    lapack_complex_double *lapack_DXHDF, *lapack_DXres; // structures to pass complex valued arrays to lapacke_zgelsd
+    PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DXHDF);
+    PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DXres);
 
     // Set up precondition context
-    PCCreate(PETSC_COMM_SELF,&prec);
-    if (pc==1) {
-        PCSetType(prec,PCICC);                                      // ICC(0), Block-Jacobi
+    PCCreate(PETSC_COMM_SELF, &prec);
+    if (pc == 1) {
+        PCSetType(prec, PCICC);                                      // ICC(0), Block-Jacobi
         PetscPrintf(PETSC_COMM_WORLD, "PGR preconditioned with Block-Jacobi using ICC(0).\n");
     }
-    else if (pc==0) {
+    else if (pc == 0) {
         PCSetType(prec, PCJACOBI);                                  // Jacobi
         PetscPrintf(PETSC_COMM_WORLD, "PGR preconditioned with Jacobi.\n");
     }
@@ -125,7 +129,7 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
             /***********************
              *  Galerkin-Richardson  *
              ***********************/
-            Galerkin_Richardson(DXres, DX, DF, res, m, svec, DXtDF);
+            Galerkin_Richardson(DXres, DX, DF, res, m, svec, DXHDF, lapack_DXHDF, lapack_DXres);
 
             for (i=0; i<m; i++)                                     // x = x + DX' * DXres
                 VecAXPY(x, DXres[i], DX[i]);                       
@@ -187,36 +191,52 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     free(local);
     free(DXres);
     free(svec);
-    free(DXtDF);
+    free(DXHDF);
     PCDestroy(&prec);
+    PetscFree(lapack_DXHDF);
+    PetscFree(lapack_DXres);
 }
 
 /**
- * @brief   Galerkin_Richardson update
+ * @brief   Galerkin update
  *
  *          x_new = x_prev + DX * (pinv(DX'*DF)*(DX'*res));
  */
 
-void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DXtDF)
+void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DXHDF,
+    lapack_complex_double *lapack_DXHDF, lapack_complex_double *lapack_DXres)
 {
-    int lprank, i, j;
+    int lprank, i, j, info;
     /////////////////////////////////////////////////
 
     for (i = 0; i < m; i++)
         for(j = 0; j < m; j++)
-            VecTDotBegin(DX[i], DF[j], &DXtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+            VecDotBegin(DF[j], DX[i], &DXHDF[i+m*j]);               // DXHDF(i,j) = DX[i]^H * DF[j]
     
     for (i = 0; i < m; i++)
-        VecTDotBegin(DX[i], res, &DXres[i]);                         // DFres(i)   = DF[i]' * res
+        VecDotBegin(res, DX[i], &DXres[i]);                         // DXres(i)   = DX[i]^H * res
 
     for (i = 0; i < m; i++)
-        for(j = 0; j < m; j++)
-            VecTDotEnd(DX[i], DF[j], &DXtDF[m*i+j]);   
+        for(j = 0; j < m; j++){
+            VecDotEnd(DF[j], DX[i], &DXHDF[i+m*j]);   
+
+            lapack_DXHDF[i+m*j].real = (double)PetscRealPart(DXHDF[i+m*j]);
+            lapack_DXHDF[i+m*j].imag = (double)PetscImaginaryPart(DXHDF[i+m*j]);
+        }
     
-    for (i = 0; i < m; i++)
-        VecTDotEnd(DX[i], res, &DXres[i]); 
+    for (i = 0; i < m; i++){
+        VecDotEnd(res, DX[i], &DXres[i]); 
+        lapack_DXres[i].real = (double)PetscRealPart(DXres[i]);
+        lapack_DXres[i].imag = (double)PetscImaginaryPart(DXres[i]);
+    }
 
     // Least square problem solver. DXres = pinv(DX'*DF)*(DX'*res)
-    LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DXtDF, m, DXres, m, svec, -1.0, &lprank);
+    info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DXHDF, m, lapack_DXres, m, svec, -1.0, &lprank);
+    if(info != 0)
+        PetscPrintf(PETSC_COMM_WORLD,"Error in LAPACKE_zgelsd, info=%d \n",info);
+
+    for (i = 0; i < m; i++){
+        DXres[i] = lapack_DXres[i].real + PETSC_i * lapack_DXres[i].imag; 
+    }
 }
 

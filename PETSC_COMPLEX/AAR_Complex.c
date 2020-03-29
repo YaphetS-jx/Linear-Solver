@@ -28,7 +28,7 @@
  *          da       : PETSC data structure
  */
 
-void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
+void AAR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
     PetscInt m, PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da) 
 {
     int iter = 1, k, i;
@@ -41,7 +41,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6], Np;
-    PetscScalar *local, *DFres, ***r, *DFtDF;
+    PetscScalar *local, *DFres, ***r, *DFHDF;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
@@ -49,24 +49,24 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     svec = malloc(m * sizeof(double));
-    DFtDF = malloc(m*m * sizeof(PetscScalar));  // DFtDF = DF' * DF
-    MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
+    DFHDF = malloc(m*m * sizeof(PetscScalar));  // DFHDF = DF' * DF
+    MatGetDiagonalBlock(A, &Dblock);             // diagonal block of matrix A
 
-    lapack_complex_double *lapack_DFtDF, *lapack_DFres; // structures to pass complex valued arrays to lapacke_zgelsd
-    PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFtDF);
+    lapack_complex_double *lapack_DFHDF, *lapack_DFres; // structures to pass complex valued arrays to lapacke_zgelsd
+    PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DFres);
 
     // Set up precondition context
-    PCCreate(PETSC_COMM_SELF,&prec);
-    if (pc==1) {
-        PCSetType(prec,PCICC);                  //ICC(0), Block-Jacobi
+    PCCreate(PETSC_COMM_SELF, &prec);
+    if (pc == 1) {
+        PCSetType(prec, PCICC);                  //ICC(0), Block-Jacobi
         PetscPrintf(PETSC_COMM_WORLD,"AAR preconditioned with Block-Jacobi using ICC(0).\n");
     }
-    else if (pc==0) {
-        PCSetType(prec,PCJACOBI);               // Jacobi
+    else if (pc == 0) {
+        PCSetType(prec, PCJACOBI);               // Jacobi
         PetscPrintf(PETSC_COMM_WORLD,"AAR preconditioned with Jacobi (AAJ).\n");
     }
-    PCSetOperators(prec,Dblock,Dblock);
+    PCSetOperators(prec, Dblock, Dblock);
 
     // Initialize vectors
     VecDuplicate(x, &x_old);
@@ -100,9 +100,11 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
         t2 = MPI_Wtime();
+
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
+        
         t3 = MPI_Wtime();
         tp += (t3 - t2);
 
@@ -126,7 +128,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
              *  Anderson extrapolation update  *
              ***********************************/
             t2 = MPI_Wtime();
-            Anderson(DFres, DF, res, m, svec, DFtDF, lapack_DFtDF, lapack_DFres);
+            Anderson(DFres, DF, res, m, svec, DFHDF, lapack_DFHDF, lapack_DFres);
 
             for (i=0; i<m; i++){                // x = x - (DX + beta*DF)' * DFres
                 VecWAXPY(DXDF, beta, DF[i], DX[i]);
@@ -188,8 +190,8 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     free(DFres);
     PCDestroy(&prec);
     free(svec);
-    free(DFtDF);
-    PetscFree(lapack_DFtDF);
+    free(DFHDF);
+    PetscFree(lapack_DFHDF);
     PetscFree(lapack_DFres);
 }
 
@@ -199,29 +201,29 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
  *          x_new = x_prev + beta*res - (DX + beta*DF)*(pinv(DF'*DF)*(DF'*res));
  */
 
-void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFtDF, 
-            lapack_complex_double *lapack_DFtDF, lapack_complex_double *lapack_DFres)
+void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFHDF, 
+            lapack_complex_double *lapack_DFHDF, lapack_complex_double *lapack_DFres)
 {
     int lprank, i, j, info;
     /////////////////////////////////////////////////
 
     for (i = 0; i < m; i++)
         for(j = 0; j < i+1; j++)
-            VecDotBegin(DF[j], DF[i], &DFtDF[i+m*j]);          // DFtDF(i,j) = DF[i]' * DF[j]
+            VecDotBegin(DF[j], DF[i], &DFHDF[i+m*j]);          // DFHDF(i,j) = DF[i]' * DF[j]
         
     for (i = 0; i < m; i++)
         VecDotBegin(res, DF[i], &DFres[i]);                    // DFres(i)   = DF[i]' * res
 
     for (i = 0; i < m; i++)
         for(j = 0; j < i+1; j++){
-            VecDotEnd(DF[j], DF[i], &DFtDF[i+m*j]);
-            DFtDF[j+m*i] = PetscConjComplex(DFtDF[i+m*j]);     // DFtDF(j,i) = DFtDF(i,j)
+            VecDotEnd(DF[j], DF[i], &DFHDF[i+m*j]);
+            DFHDF[j+m*i] = PetscConjComplex(DFHDF[i+m*j]);     // DFHDF(j,i) = DFHDF(i,j)
 
-            lapack_DFtDF[i+m*j].real = (double)PetscRealPart(DFtDF[i+m*j]);
-            lapack_DFtDF[i+m*j].imag = (double)PetscImaginaryPart(DFtDF[i+m*j]);
+            lapack_DFHDF[i+m*j].real = (double)PetscRealPart(DFHDF[i+m*j]);
+            lapack_DFHDF[i+m*j].imag = (double)PetscImaginaryPart(DFHDF[i+m*j]);
 
-            lapack_DFtDF[j+m*i].real = lapack_DFtDF[i+m*j].real;
-            lapack_DFtDF[j+m*i].imag = -lapack_DFtDF[i+m*j].imag; 
+            lapack_DFHDF[j+m*i].real = lapack_DFHDF[i+m*j].real;
+            lapack_DFHDF[j+m*i].imag = -lapack_DFHDF[i+m*j].imag; 
         }
         
     for (i = 0; i < m; i++){
@@ -231,7 +233,7 @@ void Anderson(PetscScalar *DFres, Vec *DF, Vec res, PetscInt m, double *svec, Pe
     }
 
     // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
-    info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DFtDF, m, lapack_DFres, m, svec, -1.0, &lprank);
+    info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DFHDF, m, lapack_DFres, m, svec, -1.0, &lprank);
     if(info != 0)
         PetscPrintf(PETSC_COMM_WORLD,"Error in LAPACKE_zgelsd, info=%d \n",info);
 

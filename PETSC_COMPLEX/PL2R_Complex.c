@@ -1,6 +1,6 @@
 /**
  * @file    PL2R_Complex.c
- * @brief   This file contains Periodic L2_Richardson solver and its 
+ * @brief   This file contains Periodic L2_Richardson complex solver and its 
  *          required functions
  *
  * @author  Xin Jing <xjing30@gatech.edu>
@@ -27,8 +27,8 @@
  *          da       : PETSC data structure
  */
 
-void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
-    PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da) 
+void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
+    PetscInt m, PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da) 
 {
     int iter = 1, k, i; 
     double b_2norm, r_2norm, *svec;
@@ -39,7 +39,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     PC prec;
     Mat Dblock;
     PetscInt blockinfo[6], Np;
-    PetscScalar *local, *DFres, ***r, *DFtDF;
+    PetscScalar *local, *DFres, ***r, *DFHDF;
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
@@ -47,9 +47,13 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));      // DFres = DF' * res
     svec = malloc(m * sizeof(double));
-    DFtDF = malloc(m*m * sizeof(PetscScalar));  // DFtDF = DF' * DF
-    assert(local != NULL && DFres != NULL && svec != NULL && DFtDF != NULL);
+    DFHDF = malloc(m*m * sizeof(PetscScalar));  // DFHDF = DF' * DF
+    assert(local != NULL && DFres != NULL && svec != NULL && DFHDF != NULL);
     MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
+
+    lapack_complex_double *lapack_DFHDF, *lapack_DFres; // structures to pass complex valued arrays to lapacke_zgelsd
+    PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFHDF);
+    PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DFres);
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF,&prec);
@@ -127,7 +131,7 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
             /***********************
              *    L2_Richardson    *
              ***********************/
-            L2_Richardson(DFres, DF, res, m, svec, DFtDF);
+            L2_Richardson(DFres, DF, res, m, svec, DFHDF, lapack_DFHDF, lapack_DFres);
 
             for (i=0; i<m; i++)                    // x = x + DX' * DXres
                 VecAXPY(x, DFres[i], DX[i]);                            
@@ -188,8 +192,10 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     free(local);
     free(DFres);
     free(svec);
-    free(DFtDF);
+    free(DFHDF);
     PCDestroy(&prec);
+    PetscFree(lapack_DFHDF);
+    PetscFree(lapack_DFres);
 }
 
 /**
@@ -198,27 +204,43 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
  *          x_new = x_prev + DX * (pinv(DF'*DF)*(DF'*res));
  */
 
-void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFtDF)
+void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFHDF,
+    lapack_complex_double *lapack_DFHDF, lapack_complex_double *lapack_DFres)
 {
-    int lprank, i, j;
+    int lprank, i, j, info;
     /////////////////////////////////////////////////
 
-    for (i=0; i<m; i++)
-        for(j=0; j<i+1; j++)
-            VecTDotBegin(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
+    for (i = 0; i < m; i++)
+        for(j = 0; j<i+1; j++)
+            VecDotBegin(DF[j], DF[i], &DFHDF[i+m*j]);               // DFHDF(i,j) = DF[i]' * DF[j]
         
-    for (i=0; i<m; i++)
-        VecTDotBegin(DF[i], res, &DFres[i]);                         // DFres(i)   = DF[i]' * res
+    for (i = 0; i < m; i++)
+        VecDotBegin(res, DF[i], &DFres[i]);                         // DFres(i)   = DF[i]' * res
 
-    for (i=0; i<m; i++)
-        for(j=0; j<i+1; j++){
-            VecTDotEnd(DF[i], DF[j], &DFtDF[m*i+j]);               // DFtDF(i,j) = DF[i]' * DF[j]
-            DFtDF[i+m*j] = DFtDF[m*i+j];                        // DFtDF(j,i) = DFtDF(i,j) symmetric 
+    for (i = 0; i < m; i++)
+        for(j=0; j < i+1; j++){
+            VecDotEnd(DF[j], DF[i], &DFHDF[i+m*j]);               // DFHDF(i,j) = DF[i]' * DF[j]
+            DFHDF[j+m*i] = PetscConjComplex(DFHDF[i+m*j]);        // DFHDF(j,i) = DFHDF(i,j)
+
+            lapack_DFHDF[i+m*j].real = (double)PetscRealPart(DFHDF[i+m*j]);
+            lapack_DFHDF[i+m*j].imag = (double)PetscImaginaryPart(DFHDF[i+m*j]);
+
+            lapack_DFHDF[j+m*i].real = lapack_DFHDF[i+m*j].real;
+            lapack_DFHDF[j+m*i].imag = -lapack_DFHDF[i+m*j].imag;
         }
         
-    for (i=0; i<m; i++)
-        VecTDotEnd(DF[i], res, &DFres[i]);                         // DFres(i)
+    for (i = 0; i < m; i++){
+        VecDotEnd(res, DF[i], &DFres[i]);                         // DFres(i)
+        lapack_DFres[i].real = (double)PetscRealPart(DFres[i]);
+        lapack_DFres[i].imag = (double)PetscImaginaryPart(DFres[i]);
+    }
 
     // Least square problem solver. DFres = pinv(DF'*DF)*(DF'*res)
-    LAPACKE_dgelsd(LAPACK_COL_MAJOR, m, m, 1, DFtDF, m, DFres, m, svec, -1.0, &lprank);
+    info = LAPACKE_zgelsd(LAPACK_COL_MAJOR, m, m, 1, lapack_DFHDF, m, lapack_DFres, m, svec, -1.0, &lprank);
+    if(info != 0)
+        PetscPrintf(PETSC_COMM_WORLD,"Error in LAPACKE_zgelsd, info=%d \n",info);
+
+    for (i = 0; i < m; i++){
+        DFres[i] = lapack_DFres[i].real + PETSC_i * lapack_DFres[i].imag; 
+    }
 }

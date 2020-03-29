@@ -1,6 +1,6 @@
 /**
- * @file    PL2R_Real.h
- * @brief   This file declares the functions for Periodic L2_Richardson solver. 
+ * @file    PL2R_Complex.h
+ * @brief   This file declares the functions for Periodic L2_Richardson complex solver. 
  *
  * @author  Xin Jing <xjing30@gatech.edu>
  *          Phanish Suryanarayana <phanish.suryanarayana@ce.gatech.edu>
@@ -14,9 +14,10 @@
 #include "system.h"
 #include "tools.h"
 
-void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
-          PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
+void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta, 
+          PetscInt m, PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da);
 
-void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFtDF);
+void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DFHDF,
+    lapack_complex_double *lapack_DFHDF, lapack_complex_double *lapack_DFres);
 
 #endif

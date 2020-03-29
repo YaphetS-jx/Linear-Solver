@@ -14,9 +14,10 @@
 #include "system.h"
 #include "tools.h"
 
-void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
-    PetscInt m, PetscInt p, PetscScalar tol, int max_iter, PetscInt pc, DM da);
+void PRG_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
+    PetscInt m, PetscInt p, PetscReal tol, int max_iter, PetscInt pc, DM da);
 
-void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DXtDF);
+void Galerkin_Richardson(PetscScalar * DXres, Vec *DX, Vec *DF, Vec res, PetscInt m, double *svec, PetscScalar *DXHDF,
+    lapack_complex_double *lapack_DXHDF, lapack_complex_double *lapack_DXres);
 
 #endif
