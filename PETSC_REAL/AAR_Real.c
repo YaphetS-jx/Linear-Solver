@@ -50,6 +50,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     svec = malloc(m * sizeof(double));
     DFtDF = malloc(m*m * sizeof(PetscScalar));  // DFtDF = DF' * DF
+    assert(local != NULL && DFres != NULL && svec != NULL && DFtDF != NULL);
     MatGetDiagonalBlock(A,&Dblock);             // diagonal block of matrix A
 
     // Set up precondition context
@@ -76,10 +77,8 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
  
     t2 = MPI_Wtime();
     tpre = t2 - t0;
-
     VecNorm(b, NORM_2, &b_2norm); 
     tol *= b_2norm;
-
     t3 = MPI_Wtime();
     tn += (t3-t2);   
 
@@ -87,7 +86,7 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     MatMult(A,x,res); 
     t3 = MPI_Wtime();
     tax += (t3-t2);   
-
+    
     VecAYPX(res, -1.0, b);                      // res = b- A * x
     r_2norm = tol + 1;
 
@@ -127,7 +126,6 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
              ***********************************/
             
             t2 = MPI_Wtime();
-
             Anderson(DFres, DF, res, m, svec, DFtDF);
 
             for (i=0; i<m; i++){                // x = x - (DX + beta*DF)' * DFres
@@ -136,25 +134,20 @@ void AAR(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
             }
 
             VecAXPY(x, beta, res);              // x = x + beta * res
-
             t3 = MPI_Wtime();
             ta += (t3 - t2);
         }
 
         t2 = MPI_Wtime();
-
         MatMult(A,x,res);                       // res = b - A * x
-
         t3 = MPI_Wtime();
         tax += (t3 - t2);  
 
         VecAYPX(res, -1.0,b);
    
         t2 = MPI_Wtime();
-
         if (iter % p == 0) 
             VecNorm(res, NORM_2, &r_2norm); 
-
         t3 = MPI_Wtime();
         tn += (t3 - t2); 
 

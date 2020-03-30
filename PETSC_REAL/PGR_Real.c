@@ -96,11 +96,9 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
     while (r_2norm > tol && iter <= max_iter){
         // Apply precondition here 
         t2 = MPI_Wtime();
-
         GetLocalVector(da, res, &res_local, blockinfo, Np, local, &r);
         PCApply(prec, res_local, pres_local);
         RestoreGlobalVector(da, res, pres_local, blockinfo, local, &r);
-
         t3 = MPI_Wtime();
         tp += (t3-t2);
 
@@ -137,16 +135,14 @@ void PGR(Mat A, Vec x, Vec b, PetscScalar omega,
 
             VecWAXPY(DF[k], -1.0, Ax_prev, Ax);                     // update DF[k] = Ax - Ax_prev
         }
-        
         t3 = MPI_Wtime();
         ta += (t3 - t2);
 
         VecWAXPY(res, -1.0, Ax, b);
-        
+
         t2 = MPI_Wtime();
         if (iter % p == 0) 
             VecNorm(res, NORM_2, &r_2norm); 
-
         t3 = MPI_Wtime();
         tn += (t3 - t2); 
 

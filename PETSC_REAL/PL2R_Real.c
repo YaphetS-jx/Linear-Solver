@@ -84,12 +84,11 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     tn += (t3-t2);   
 
     t2 = MPI_Wtime();
-    // res = b- A * x
-    MatMult(A, x, Ax); 
+    MatMult(A, x, Ax);                  
     t3 = MPI_Wtime();
     tax += (t3-t2);
 
-    VecWAXPY(res, -1.0, Ax, b);
+    VecWAXPY(res, -1.0, Ax, b);                     // res = b- A * x
     r_2norm = tol + 1;
 
 #ifdef DEBUG
@@ -138,7 +137,6 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
                 VecAXPY(Ax, DFres[i], DF[i]);
             VecWAXPY(DF[k], -1.0, Ax_prev, Ax);    // update DF[k] = Ax - Ax_prev
         }
-        
         t3 = MPI_Wtime();
         ta += (t3 - t2);
 
@@ -147,7 +145,6 @@ void PL2R(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
         t2 = MPI_Wtime();
         if (iter % p == 0) 
             VecNorm(res, NORM_2, &r_2norm);             
-        
         t3 = MPI_Wtime();
         tn += (t3-t2);   
 
