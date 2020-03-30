@@ -1,7 +1,7 @@
 
 /*=============================================================================================
 | Alternating Anderson Richardson (AAR), Periodic Galerkin Richardson (PGR), 
-| Periodic L2 Richardson (PL2R) code and tests in real-valued systems.
+| Periodic L2 Richardson (PL2R) code and tests in complex-valued systems.
 | Copyright (C) 2020 Material Physics & Mechanics Group at Georgia Tech.
 | 
 | Authors: Xin Jing, Phanish Suryanarayana
@@ -33,9 +33,9 @@ int main( int argc, char **argv ) {
 
     // Compute RHS and Matrix for the Poisson equation
     ComputeMatrixA(&system);     
-    // Matrix, A = psystem->helmholtzOpr
-    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "psystem->helmholtzOpr"
-    // and right hand side through "psystem->RHS". 
+    // Matrix, A = system->helmholtzOpr
+    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "system->helmholtzOpr"
+    // and right hand side through "system->RHS". 
 
     t1 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
@@ -43,10 +43,10 @@ int main( int argc, char **argv ) {
     PetscPrintf(PETSC_COMM_WORLD,"*************************************************************************** \n \n");
     
     fp = fopen("time.txt", "w");
+    // -------------- AAR solver --------------------------
     for (i = 0; i < 1; i ++){
         VecSet(system.AAR, 1.0);
         t2 = MPI_Wtime();
-        // -------------- AAR solver --------------------------
         AAR_Complex(system.helmholtzOpr, system.AAR, system.RHS, system.omega, 
             system.beta, system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
         t3 = MPI_Wtime();
@@ -54,11 +54,10 @@ int main( int argc, char **argv ) {
         fprintf(fp, "%g\n", t3 - t2);
     }
 
-
+    // -------------- PGR solver --------------------------
     for (i = 0; i < 1; i ++){
         VecSet(system.PGR, 1.0);
         t2 = MPI_Wtime();
-        // -------------- PGR solver --------------------------
         PGR_Complex(system.helmholtzOpr, system.PGR, system.RHS, system.omega, 
             system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
         t3 = MPI_Wtime();
@@ -66,11 +65,10 @@ int main( int argc, char **argv ) {
         fprintf(fp, "%g\n", t3 - t2);
     }
 
-
+    // -------------- PL2R solver --------------------------
     for (i = 0; i < 1; i ++){
         VecSet(system.PL2R, 1.0);
         t2 = MPI_Wtime();
-        // -------------- PL2R solver --------------------------
         PL2R_Complex(system.helmholtzOpr, system.PL2R, system.RHS, system.omega, 
             system.m, system.p, system.solver_tol, 2000, system.pc, system.da);
         t3 = MPI_Wtime();
@@ -78,8 +76,6 @@ int main( int argc, char **argv ) {
         fprintf(fp, "%g\n", t3 - t2);
     }
 
-
-    // VecView(system.Phi, PETSC_VIEWER_STDOUT_WORLD);
     KSPCreate(PETSC_COMM_WORLD, &ksp);
 
     KSPSetOperators(ksp, system.helmholtzOpr, system.helmholtzOpr);
@@ -197,8 +193,8 @@ int main( int argc, char **argv ) {
                                 A_norm, b_norm, x1_norm, x2_norm, x3_norm, x4_norm, x5_norm, x6_norm);
 #endif
     
-    // VecDestroy(&res);
-    // KSPDestroy(&ksp);
+    VecDestroy(&res);
+    KSPDestroy(&ksp);
     Objects_Destroy(&system); 
     ierr = PetscFinalize();
     CHKERRQ(ierr);
