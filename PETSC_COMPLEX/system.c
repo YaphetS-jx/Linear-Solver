@@ -16,10 +16,10 @@ void Read_parameters(petsc_complex* system, int argc, char **argv) {
     PetscInt p, i; 
     PetscReal Nr, Dr, val; 
 
-    system->order = 1;                                  // store half order
-    system->numPoints_x = 8;                           // system size in x direction
-    system->numPoints_y = 8;                           // system size in y direction
-    system->numPoints_z = 8;                           // system size in z direction
+    system->order = 6;                                  // store half order
+    system->numPoints_x = 48;                           // system size in x direction
+    system->numPoints_y = 48;                           // system size in y direction
+    system->numPoints_z = 48;                           // system size in z direction
 
     if (argc < 7) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n"); 
