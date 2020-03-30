@@ -40,8 +40,10 @@ void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
     Mat Dblock;
     PetscInt blockinfo[6], Np;
     PetscScalar *local, * DXres, ***r, *DXHDF;
+    lapack_complex_double *lapack_DXHDF, *lapack_DXres; 
     /////////////////////////////////////////////////
- 
+    PetscErrorCode ierr;
+
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
     Np = blockinfo[3] * blockinfo[4] * blockinfo[5];
     local = (PetscScalar *) calloc (Np, sizeof(PetscScalar));
@@ -52,9 +54,9 @@ void PGR_Complex(Mat A, Vec x, Vec b, PetscScalar omega,
     MatGetDiagonalBlock(A, &Dblock);                                // diagonal block of matrix A
 
     // structures to pass complex valued arrays to lapacke_zgelsd
-    lapack_complex_double *lapack_DXHDF, *lapack_DXres; 
     PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DXHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DXres);
+    assert(lapack_DXHDF != NULL && lapack_DXres != NULL);
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF, &prec);

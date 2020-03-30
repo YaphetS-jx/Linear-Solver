@@ -42,6 +42,7 @@ void AAR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     Mat Dblock;
     PetscInt blockinfo[6], Np;
     PetscScalar *local, *DFres, ***r, *DFHDF;
+    lapack_complex_double *lapack_DFHDF, *lapack_DFres; 
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
@@ -50,12 +51,13 @@ void AAR_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscScalar beta,
     DFres = (PetscScalar *) calloc (m , sizeof(PetscScalar));
     svec = malloc(m * sizeof(double));
     DFHDF = malloc(m*m * sizeof(PetscScalar));   // DFHDF = DF^H * DF
+    assert(local != NULL && DFres != NULL && svec != NULL && DFHDF != NULL);
     MatGetDiagonalBlock(A, &Dblock);             // diagonal block of matrix A
 
     // structures to pass complex valued arrays to lapacke_zgelsd
-    lapack_complex_double *lapack_DFHDF, *lapack_DFres; 
     PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DFres);
+    assert(lapack_DFHDF != NULL && lapack_DFres != NULL);
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF, &prec);

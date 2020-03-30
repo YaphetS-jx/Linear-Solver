@@ -40,6 +40,7 @@ void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscInt m,
     Mat Dblock;
     PetscInt blockinfo[6], Np;
     PetscScalar *local, *DFres, ***r, *DFHDF;
+    lapack_complex_double *lapack_DFHDF, *lapack_DFres; 
     /////////////////////////////////////////////////
  
     DMDAGetCorners(da, blockinfo, blockinfo+1, blockinfo+2, blockinfo+3, blockinfo+4, blockinfo+5);
@@ -52,9 +53,9 @@ void PL2R_Complex(Mat A, Vec x, Vec b, PetscScalar omega, PetscInt m,
     MatGetDiagonalBlock(A,&Dblock);                                // diagonal block of matrix A
 
     // structures to pass complex valued arrays to lapacke_zgelsd
-    lapack_complex_double *lapack_DFHDF, *lapack_DFres; 
     PetscMalloc(sizeof(lapack_complex_double)*(m * m), &lapack_DFHDF);
     PetscMalloc(sizeof(lapack_complex_double)*(m), &lapack_DFres);
+    assert(lapack_DFHDF != NULL && lapack_DFres != NULL);
 
     // Set up precondition context
     PCCreate(PETSC_COMM_SELF,&prec);
@@ -245,3 +246,4 @@ void L2_Richardson(PetscScalar * DFres, Vec *DF, Vec res, PetscInt m, double *sv
         DFres[i] = lapack_DFres[i].real + PETSC_i * lapack_DFres[i].imag; 
     }
 }
+
