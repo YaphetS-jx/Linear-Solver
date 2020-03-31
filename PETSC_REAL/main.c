@@ -162,7 +162,7 @@ int main( int argc, char **argv ) {
     KSPSetInitialGuessNonzero(ksp, PETSC_TRUE);
     KSPSetFromOptions(ksp);
 
-    for (i = 0; i < 50; i ++){
+    for (i = 0; i < no_of_test; i ++){
         VecSet(system.GMRES, 1.0);
         t2 = MPI_Wtime();
         
