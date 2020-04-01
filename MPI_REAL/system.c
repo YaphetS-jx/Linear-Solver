@@ -13,11 +13,11 @@
 #include "system.h"
 #include "tools.h"
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-// Setup & Initialize
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief   CheckInputs
+ *
+ *          Read and set parameters from command line
+ */
 
 void CheckInputs(DS* pAAR, int argc, char ** argv)  {
     int rank;
@@ -58,16 +58,18 @@ void CheckInputs(DS* pAAR, int argc, char ** argv)  {
     }
 }
 
+/**
+ * @brief   Initialize
+ *
+ *          Allocate memory space for variables
+ */
 
 void Initialize(DS* pAAR) {
     int i, j, k;
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);   
 
-    /// Read from an input file, store the data in data structure  and write the data to the output file. 
     Read_input(pAAR);    
-
-    /// Initialize quantities.
     Processor_domain(pAAR); 
 
     int coords[3];
@@ -141,8 +143,6 @@ void Initialize(DS* pAAR) {
         }
     }
 
-    // ---------------------------------------------
-
     srand(rank+pAAR->nproc);  
     for (k = 0; k < pAAR->np_z; k++) {
         for (j = 0; j < pAAR->np_z; j++) {
@@ -157,15 +157,19 @@ void Initialize(DS* pAAR) {
     convert_to_vector(pAAR->phi, pAAR->phi_v3, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
     convert_to_vector(pAAR->phi, pAAR->phi_v4, pAAR->np_x, pAAR->np_y, pAAR->np_z, pAAR->FDn);
     convert_to_vector(pAAR->rhs, pAAR->rhs_v, pAAR->np_x, pAAR->np_y, pAAR->np_z, 0);
-        
 }
+
+/**
+ * @brief   Read_input
+ *
+ *          Broadcast parameters and compute Laplacian coefficients
+ */
 
 void Read_input(DS* pAAR) {
     int rank, p, i; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     double Nr, Dr, val; 
 
-  // ----------------- Bcast ints together and doubles together (two MPI_Bcast 's) --------------------
     int bcast_int[2] = {pAAR->m, pAAR->p}; 
     double bcast_double[3] = {pAAR->solver_tol, pAAR->omega, pAAR->beta}; 
     MPI_Bcast(bcast_int, 2, MPI_INT, 0, MPI_COMM_WORLD); 
@@ -193,7 +197,7 @@ void Read_input(DS* pAAR) {
         printf("nprocx = %u, nprocy = %u, nprocz = %u. \n", pAAR->nprocx, pAAR->nprocy, pAAR->nprocz); 
     }
 
-// Compute Finite Difference coefficients for Laplacian (Del^2)
+    // Compute Finite Difference coefficients for Laplacian (Del^2)
     pAAR->coeff_lap = (double*) calloc((pAAR->FDn+1), sizeof(double)); 
     pAAR->coeff_lap[0] = 0; 
     for (p = 1;  p <= pAAR->FDn;  p++)
@@ -211,7 +215,12 @@ void Read_input(DS* pAAR) {
 
 }
 
-// function to compute end nodes of processor domain
+/**
+ * @brief   Processor_domain
+ *
+ *          Compute end nodes of processor domain
+ */
+
 void Processor_domain(DS* pAAR) {
     int rank, count, countx, county, countz; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
@@ -259,8 +268,12 @@ void Processor_domain(DS* pAAR) {
     } // end for over all processors count
 }
 
+/**
+ * @brief   Comm_topologies
+ *
+ *          Create communicator topologies
+ */
 
-// function to create communicator topologies
 void Comm_topologies(DS* pAAR, int *pcoords) {
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
@@ -274,11 +287,7 @@ void Comm_topologies(DS* pAAR, int *pcoords) {
     int rank_chk; 
     MPI_Cart_rank(topocomm, pcoords, &rank_chk);  // proc rank corresponding to coords
 
-    //////////////////////////////////////////////////////
-    //// Cartesian Topology///////////////////////////////
-    // This topology has atleast 6 nearest neighbors for communication in 3D
-    //////////////////////////////////////////////////////
-
+    // Cartesian Topology
     int nneigh = 6*ceil((double)(pAAR->FDn-(1e-12))/pAAR->np_x);  // total number of neighbors
     int *neighs, count = 0; 
     neighs = (int*) calloc(nneigh, sizeof(int));  
@@ -309,7 +318,13 @@ void Comm_topologies(DS* pAAR, int *pcoords) {
     free(neighs); 
 }
 
-// compute preconditioned relative residual
+
+
+/**
+ * @brief   PoissonResidual
+ *
+ *          Compute Matrix A times vector x 
+ */
 
 void PoissonResidual(DS *pAAR, double *phi_v, double *Ax, int np, int FDn, MPI_Comm comm_dist_graph_cart) {
     int rank; 
@@ -471,6 +486,12 @@ void PoissonResidual(DS *pAAR, double *phi_v, double *Ax, int np, int FDn, MPI_C
     free(phi_edge_out);  //de-allocate memory
 }
 
+/**
+ * @brief   Precondition
+ *
+ *          Precondition function. This is Jacobi preconditioner
+ */
+
 void Precondition(double diag, double *res, int Np)
 {
     int i;
@@ -478,13 +499,12 @@ void Precondition(double diag, double *res, int Np)
         res[i] /= diag;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-// Communication functions
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief   Laplacian_Comm_Indices
+ *
+ *          Compute Laplacian communication indices
+ */
 
-// function to compute comm indices and arrays
 void Laplacian_Comm_Indices(DS* pAAR) {
     double TEMP_TOL = 1e-12; 
   // compute edge index information to compute residual to be used in the solver
@@ -513,8 +533,12 @@ void Laplacian_Comm_Indices(DS* pAAR) {
     EdgeIndicesForPoisson(pAAR, pAAR->LapInd.eout_s, pAAR->LapInd.eout_e, pAAR->LapInd.ein_s, pAAR->LapInd.ein_e, pAAR->LapInd.ereg_s, pAAR->LapInd.ereg_e, pAAR->LapInd.stencil_sign, pAAR->LapInd.edge_ind, pAAR->LapInd.displs_send, pAAR->LapInd.displs_recv, pAAR->LapInd.ncounts_send, pAAR->LapInd.ncounts_recv);  
 }
 
+/**
+ * @brief   EdgeIndicesForPoisson
+ *
+ *          function to compute edge region indices
+ */
 
-// function to compute edge region indices
 void EdgeIndicesForPoisson(DS* pAAR, int **eout_s, int **eout_e, int **ein_s, int **ein_e, int ereg_s[3][26], int ereg_e[3][26], 
                             int **stencil_sign, int **edge_ind, int *displs_send, int *displs_recv, int *ncounts_send, int *ncounts_recv) {
     // eout: start(s) and end(e) node indices w.r.t proc domain of the outgoing edges
@@ -790,13 +814,12 @@ void EdgeIndicesForPoisson(DS* pAAR, int **eout_s, int **eout_e, int **ein_s, in
     free(send_ind_arry); 
 }
 
+/**
+ * @brief   Deallocate_memory
+ *
+ *          Free all previously allocated memory space
+ */
 
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-// Deallocate memory
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
 void Deallocate_memory(DS* pAAR)  {
     int j, k; 
     int rank; 
@@ -857,6 +880,11 @@ void Deallocate_memory(DS* pAAR)  {
 
 }
 
+/**
+ * @brief   convert_to_vector
+ *
+ *          Convert a 3-dimensional vector to a 1-dimensional vector
+ */
 
 void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis){
     int i, j, k, ctr = 0;
@@ -865,6 +893,12 @@ void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, 
             for (i = 0; i < np_x; i++)             
                 vector[ctr++] = vector_3d[k+dis][j+dis][i+dis]; 
 }
+
+/**
+ * @brief   convert_to_vector3d
+ *
+ *          Convert a 1-dimensional vector to a 3-dimensional vector
+ */
 
 void convert_to_vector3d(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis){
     int i, j, k, ctr = 0;
