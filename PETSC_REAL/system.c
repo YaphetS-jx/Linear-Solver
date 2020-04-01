@@ -10,6 +10,12 @@
 
 #include "system.h"
 
+/**
+ * @brief   Read_parameters
+ *
+ *          Read and set parameters from command line
+ */
+
 void Read_parameters(petsc_real* system, int argc, char **argv) {    
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
@@ -86,16 +92,17 @@ void Read_parameters(petsc_real* system, int argc, char **argv) {
     return; 
 }
 
-/*****************************************************************************/
-/*****************************************************************************/
-/*********************** Setup and finalize functions ************************/
-/*****************************************************************************/
-/*****************************************************************************/
 
 void Setup_and_Initialize(petsc_real* system, int argc, char **argv) {
     Read_parameters(system, argc, argv); 
     Objects_Create(system);      
 }
+
+/**
+ * @brief   Objects_Create
+ *
+ *          Create all required objects in system
+ */
 
 void Objects_Create(petsc_real* system) {
     PetscInt n_x = system->numPoints_x; 
@@ -180,8 +187,12 @@ void Objects_Create(petsc_real* system) {
 
 }
 
+/**
+ * @brief   Objects_Destroy
+ *
+ *          Destroy all objects inside system
+ */
 
-// Destroy objects
 void Objects_Destroy(petsc_real* system) {
     DMDestroy(&system->da); 
     VecDestroy(&system->RHS); 
@@ -195,11 +206,11 @@ void Objects_Destroy(petsc_real* system) {
     return; 
 }
 
-/*****************************************************************************/
-/*****************************************************************************/
-/***************************** Matrix creation *******************************/
-/*****************************************************************************/
-/*****************************************************************************/
+/**
+ * @brief   ComputeMatrixA
+ *
+ *          Compute Matrix A
+ */
 
 void ComputeMatrixA(petsc_real* system) {
     PetscInt i, j, k, l, colidx, gxdim, gydim, gzdim, xcor, ycor, zcor, lxdim, lydim, lzdim, nprocx, nprocy, nprocz; 

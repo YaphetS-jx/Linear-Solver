@@ -32,10 +32,10 @@ int main( int argc, char **argv ) {
     Setup_and_Initialize(&system, argc, argv);
 
     // Compute RHS and Matrix for the Poisson equation
+    /* Matrix, A = psystem->poissonOpr
+       NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "psystem->poissonOpr"
+       and right hand side through "psystem->RHS". */
     ComputeMatrixA(&system);     
-    // Matrix, A = psystem->poissonOpr
-    // NOTE: For a different problem, other than Poisson equation, provide the matrix through the variable "psystem->poissonOpr"
-    // and right hand side through "psystem->RHS". 
 
     t1 = MPI_Wtime();
     PetscPrintf(PETSC_COMM_WORLD,"\nTime spent in initialization = %.4f seconds.\n",t1-t0);
