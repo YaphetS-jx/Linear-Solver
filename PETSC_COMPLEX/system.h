@@ -53,7 +53,6 @@ typedef struct {
     Vec PL2R;
     Vec GMRES;
     Vec BICG;
-    Vec CG;
     Vec LGMRES;
 
     Mat helmholtzOpr;   

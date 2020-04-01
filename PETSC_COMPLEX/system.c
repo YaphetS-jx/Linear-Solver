@@ -10,6 +10,12 @@
 
 #include "system.h"
 
+/**
+ * @brief   Read_parameters
+ *
+ *          Read and set parameters from command line
+ */
+
 void Read_parameters(petsc_complex* system, int argc, char **argv) {    
     int rank; 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
@@ -17,9 +23,9 @@ void Read_parameters(petsc_complex* system, int argc, char **argv) {
     PetscReal Nr, Dr, val; 
 
     system->order = 6;                                  // store half order
-    system->numPoints_x = 48;                           // system size in x direction
-    system->numPoints_y = 48;                           // system size in y direction
-    system->numPoints_z = 48;                           // system size in z direction
+    system->numPoints_x = 36;                           // system size in x direction
+    system->numPoints_y = 36;                           // system size in y direction
+    system->numPoints_z = 36;                           // system size in z direction
 
     if (argc < 7) {
         PetscPrintf(PETSC_COMM_WORLD, "Wrong inputs\n"); 
@@ -69,6 +75,7 @@ void Read_parameters(petsc_complex* system, int argc, char **argv) {
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : PGR\n"); 
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : PL2R\n"); 
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : GMRES\n"); 
+    PetscPrintf(PETSC_COMM_WORLD, "Solver      : LGMRES\n"); 
     PetscPrintf(PETSC_COMM_WORLD, "Solver      : BiCGSTAB\n"); 
     if (system->pc == 1)
         PetscPrintf(PETSC_COMM_WORLD, "system_pc   : Block-Jacobi using ICC(0)\n"); 
@@ -85,16 +92,16 @@ void Read_parameters(petsc_complex* system, int argc, char **argv) {
     return; 
 }
 
-/*****************************************************************************/
-/*****************************************************************************/
-/*********************** Setup and finalize functions ************************/
-/*****************************************************************************/
-/*****************************************************************************/
-
 void Setup_and_Initialize(petsc_complex* system, int argc, char **argv) {
     Read_parameters(system, argc, argv); 
     Objects_Create(system);      
 }
+
+/**
+ * @brief   Objects_Create
+ *
+ *          Create all required objects in system
+ */
 
 void Objects_Create(petsc_complex* system) {
     PetscInt n_x = system->numPoints_x; 
@@ -105,10 +112,10 @@ void Objects_Create(petsc_complex* system) {
     PetscInt gxdim, gydim, gzdim, xcor, ycor, zcor, lxdim, lydim, lzdim, nprocx, nprocy, nprocz, gidx; 
     Mat A; 
     PetscMPIInt comm_size; 
-    PetscReal ***r, val;
+    PetscScalar ***r, val;
     MPI_Comm_size(PETSC_COMM_WORLD, &comm_size); 
 
-    PetscErrorCode ieer = DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
+    DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DM_BOUNDARY_PERIODIC, DMDA_STENCIL_STAR, n_x, n_y, n_z, 
     PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, 1, o, 0, 0, 0, &system->da);   // create a pattern and communication layout
     DMSetUp(system->da);
     DMDAGetCorners(system->da, &xcor, &ycor, &zcor, &lxdim, &lydim, &lzdim); 
@@ -119,7 +126,6 @@ void Objects_Create(petsc_complex* system) {
     VecDuplicate(system->RHS, &system->PL2R);                                
     VecDuplicate(system->RHS, &system->GMRES);                               
     VecDuplicate(system->RHS, &system->BICG);  
-    VecDuplicate(system->RHS, &system->CG);  
     VecDuplicate(system->RHS, &system->LGMRES);                                // create Initial by duplicating the pattern of RHS
 
     PetscRandom rnd; 
@@ -131,6 +137,14 @@ void Objects_Create(petsc_complex* system) {
     PetscRandomCreate(PETSC_COMM_WORLD, &rnd); 
     PetscRandomSetFromOptions(rnd); 
     
+    // Random RHS vector
+    // seed=0;  
+    // PetscRandomSetSeed(rnd,seed);
+    // PetscRandomSeed(rnd);
+
+    // VecSetRandom(system->RHS,rnd);  
+    // PetscRandomDestroy(&rnd);
+
     // generating RHS independent of number of processors
     VecAssemblyBegin(system->RHS);
     DMDAVecGetArray(system->da, system->RHS, &r); 
@@ -140,7 +154,7 @@ void Objects_Create(petsc_complex* system) {
                 gidx = (k)*n_x*n_y + (j)*n_x + (i);
                 PetscRandomSetSeed(rnd, gidx + 1);
                 PetscRandomSeed(rnd);
-                PetscRandomGetValueReal(rnd, &val);
+                PetscRandomGetValue(rnd, &val);
                 r[k][j][i] = val;
             }
     DMDAVecRestoreArray(system->da, system->RHS, &r);
@@ -152,9 +166,8 @@ void Objects_Create(petsc_complex* system) {
     VecCopy(system->AAR, system->PGR);
     VecCopy(system->AAR, system->PL2R);
     VecCopy(system->AAR, system->GMRES);
-    VecCopy(system->AAR, system->BICG);
-    VecCopy(system->AAR, system->CG);
     VecCopy(system->AAR, system->LGMRES);
+    VecCopy(system->AAR, system->BICG);
 
     if (comm_size == 1 ) {
         DMCreateMatrix(system->da, &system->helmholtzOpr); 
@@ -167,27 +180,31 @@ void Objects_Create(petsc_complex* system) {
 }
 
 
-// Destroy objects
-void Objects_Destroy(petsc_complex* system) {
+/**
+ * @brief   Objects_Destroy
+ *
+ *          Destroy all objects inside system
+ */
+
+void Objects_Destroy(petsc_complex *system) {
     DMDestroy(&system->da); 
     VecDestroy(&system->RHS); 
     VecDestroy(&system->AAR); 
     VecDestroy(&system->PGR); 
     VecDestroy(&system->PL2R); 
-    VecDestroy(&system->GMRES); 
+    VecDestroy(&system->GMRES);
+    VecDestroy(&system->LGMRES);  
     VecDestroy(&system->BICG); 
-    VecDestroy(&system->CG); 
-    VecDestroy(&system->LGMRES); 
     MatDestroy(&system->helmholtzOpr); 
-
     return; 
 }
 
-/*****************************************************************************/
-/*****************************************************************************/
-/***************************** Matrix creation *******************************/
-/*****************************************************************************/
-/*****************************************************************************/
+
+/**
+ * @brief   ComputeMatrixA
+ *
+ *          Compute Matrix A
+ */
 
 void ComputeMatrixA(petsc_complex* system) {
     PetscInt i, j, k, l, colidx, gxdim, gydim, gzdim, xcor, ycor, zcor, lxdim, lydim, lzdim, nprocx, nprocy, nprocz; 
@@ -205,7 +222,6 @@ void ComputeMatrixA(petsc_complex* system) {
 
     DMDAGetInfo(system->da, 0, &gxdim, &gydim, &gzdim, &nprocx, &nprocy, &nprocz, 0, 0, 0, 0, 0, 0);  // only get xyz dimension and number of processes in each direction
     PetscPrintf(PETSC_COMM_WORLD, "nprocx: %d, nprocy: %d, nprocz: %d\n", nprocx, nprocy, nprocz); 
-    // PetscPrintf(PETSC_COMM_WORLD, "gxdim: %d, gydim: %d, gzdim: %d\n", gxdim, gydim, gzdim);  dim = number of points
 
     DMDAGetCorners(system->da, &xcor, &ycor, &zcor, &lxdim, &lydim, &lzdim); 
     // printf("rank: %d, xcor: %d, ycor: %d, zcor: %d, lxdim: %d, lydim: %d, lzdim: %d\n", rank, xcor, ycor, zcor, lxdim, lydim, lzdim); 
@@ -242,8 +258,6 @@ void ComputeMatrixA(petsc_complex* system) {
                     val[colidx++]=system->coeffs[l]; 
                     col[colidx].i=i+l; col[colidx].j=j; col[colidx].k=k; 
                     val[colidx++]=system->coeffs[l]; 
-
-                    // 3 directions x y z and positive axis and negative axis
                 }
                 MatSetValuesStencil(system->helmholtzOpr, 1, &row, 6*o+1, col, val, ADD_VALUES); // ADD_VALUES, add values to any existing value
             }
