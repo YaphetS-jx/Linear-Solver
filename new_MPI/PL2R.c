@@ -74,7 +74,6 @@ void PL2R(POISSON *system,
     
     Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    // PoissonResidual(system, x, Ax, system->np_x, system->FDn, comm); 
     Lap_Vec_mult(system, -1.0/(4*M_PI), x, Ax, comm);
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - Ax[i];
@@ -97,7 +96,6 @@ void PL2R(POISSON *system,
             x[i] += (omega * f[i]);                                        // x = x + omega * f
         }
 
-        // PoissonResidual(system, x, Ax, system->np_x, system->FDn, comm); 
         Lap_Vec_mult(system, -1.0/(4*M_PI), x, Ax, comm);
         for (i = 0; i < Np; i++)
             f[i] = rhs[i] - Ax[i];                                         // update f = rhs - Ax

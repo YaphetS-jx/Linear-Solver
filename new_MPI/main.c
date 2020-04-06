@@ -29,10 +29,10 @@ int main(int argc, char ** argv)
     POISSON *system = malloc(sizeof(POISSON));
     assert(system != NULL);
 
-    system->ssize[0] = 3;
-    system->ssize[1] = 3;
-    system->ssize[2] = 3;
-    system->FDn = 3;
+    system->ssize[0] = 48;
+    system->ssize[1] = 48;
+    system->ssize[2] = 48;
+    system->FDn = 6;
 
     system->solver_maxiter = 1e5;
 
@@ -43,23 +43,17 @@ int main(int argc, char ** argv)
     // Compute range of each process
     Processor_Domain(system->ssize, system->psize, system->np, system->coords, system->rem, MPI_COMM_WORLD, &system->cart); 
     
+    // Estimate maximum layers 
     Max_layer(system->ssize, system->np, system->FDn, &max_layer);
 
+    // Initialize necessary variables
     Initialize(system, max_layer);
-    
+
+    // Create distributed graph topology for parallel communication
     Comm_topologies(system->FDn, system->psize, system->coords, system->rem, system->np, system->cart, &system->comm_laplacian,
         system->send_neighs, system->rec_neighs, system->send_counts, system->rec_counts, system->send_layers, system->rec_layers, &system->sources, &system->destinations);
 
-    // Lap_Vec_mult(system, -1.0/(4*M_PI), system->phi, system->Lap_phi, system->comm_laplacian);
-
-    // double norm;
-    // Vec_2Norm(system->phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
-    // if(rank == 0) printf("x_norm: %f\n", norm);
-
-    // Vec_2Norm(system->Lap_phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
-    // if(rank == 0) printf("ax_norm: %f\n", norm);
-
-
+    // start tests
     if (!rank) fp = fopen("time.txt", "w");
     no_nodes = system->psize[0] * system->psize[1] * system->psize[2];
     no_tests = 1;

@@ -24,7 +24,7 @@ void CheckInputs(POISSON *system, int argc, char ** argv)
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
 
-    if (rank  ==  0) {
+    if (!rank) {
         printf("*************************************************************************** \n"); 
         printf("                     AAR, PGR and PL2R linear solver\n"); 
         printf("*************************************************************************** \n"); 
@@ -35,7 +35,7 @@ void CheckInputs(POISSON *system, int argc, char ** argv)
     }
 
     if (argc !=  6) {
-        if (rank  ==  0) printf("Wrong inputs"); 
+        if (!rank) printf("Wrong inputs"); 
         exit(-1); 
     } else {
         system->solver_tol = atof(argv[1]); 
@@ -44,6 +44,23 @@ void CheckInputs(POISSON *system, int argc, char ** argv)
         system->omega = atof(argv[4]); 
         system->beta = atof(argv[5]); 
     }
+
+    if(!rank){
+        printf( "***************************************************************************\n"); 
+        printf( "                           INPUT PARAMETERS                                \n"); 
+        printf( "***************************************************************************\n"); 
+        printf( "FD Order    : %d\n", system->FDn * 2);
+        printf( "Solver      : AAR\n"); 
+        printf( "Solver      : PGR\n"); 
+        printf( "Solver      : PL2R\n"); 
+        printf( "Solver      : CG\n"); 
+        printf( "solver_tol  : %e \n", system->solver_tol); 
+        printf( "m           : %d\n", system->m); 
+        printf( "p           : %d\n", system->p); 
+        printf( "omega       : %lf\n", system->omega); 
+        printf( "beta        : %lf\n", system->beta); 
+        printf( "***************************************************************************\n"); 
+    }
 }
 
 
@@ -51,6 +68,13 @@ void CheckInputs(POISSON *system, int argc, char ** argv)
  * @brief   Lap_Vec_mult
  *
  *          Laplacian Matrix multiply a Vector. a * Lap * vector
+ *
+ * @system          : POISSON structure
+ * @a               : constant a
+ * @phi             : vector 
+ * @Lap_phi         : result of a * Lap * vector
+ * @comm_laplacian  : graph communication topology
+ *
  */
 
 void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_Comm comm_laplacian)
@@ -74,12 +98,12 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
     MPI_Comm_size(MPI_COMM_WORLD, &size); 
 
     ghosted_size = (psize[0] + 2 * FDn) * (psize[1] + 2 * FDn) * (psize[2] + 2 * FDn);
-    scounts = (int*) calloc(destinations, sizeof(int));
-    rcounts = (int*) calloc(sources,      sizeof(int));
-    sdispls = (int*) calloc(destinations, sizeof(int));
-    rdispls = (int*) calloc(sources,      sizeof(int));
-    x_ghosted   = (double*) calloc(ghosted_size, sizeof(double));
-    Lap_weights = (double*) calloc((FDn + 1),    sizeof(double));
+    scounts = (int*) calloc(destinations, sizeof(int));                                 // send counts of elements
+    rcounts = (int*) calloc(sources,      sizeof(int));                                 // receive counts of elements
+    sdispls = (int*) calloc(destinations, sizeof(int));                                 // send displacements
+    rdispls = (int*) calloc(sources,      sizeof(int));                                 // receive displacements
+    x_ghosted   = (double*) calloc(ghosted_size, sizeof(double));                       // ghosted x for assembly
+    Lap_weights = (double*) calloc((FDn + 1),    sizeof(double));                       // a * Lap coefficients
     assert(scounts != NULL && rcounts != NULL && sdispls != NULL && rdispls != NULL && x_ghosted != NULL && Lap_weights);
 
     // update coefficient
@@ -87,16 +111,16 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
         Lap_weights[i] = a * system->coeff_lap[i];
     }
 
-    if (size > 1) 
+    if (size > 1)                                                                       // parallel communication
     {
         scale[0] = psize[1] * psize[2];
         scale[1] = psize[0] * psize[2];
         scale[2] = psize[0] * psize[1];
 
         k = 0;
-        for (i = 0; i < 6; i++)
+        for (i = 0; i < 6; i++)                                                         // loop over 6 directions (left, right, back, front, down, up)
             for (j = 0; j < system->send_layers[i]; j++){
-                scounts[k] = system->send_counts[k] * scale[i / 2];
+                scounts[k] = system->send_counts[k] * scale[i / 2];                     // scaled by size of other 2 axis 
                 n_out += scounts[k];
 
                 if (k > 0)
@@ -115,18 +139,17 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
                 k++;
             }
 
-        x_in  = (double*) calloc(n_in,  sizeof(double));
-        x_out = (double*) calloc(n_out, sizeof(double));
+        x_in  = (double*) calloc(n_in,  sizeof(double));                                // number of elements received from each neighbor 
+        x_out = (double*) calloc(n_out, sizeof(double));                                // number of elements sent to each neighbor
         assert(x_in != NULL && x_out != NULL);
 
-
-        // assembly x_out
+        // assemble x_out
         count = 0;
         order = 0;
         for (dir = 0; dir < 6; dir++){
             for (layer = 0; layer < system->send_layers[dir]; layer++){
 
-                int start[3] = {0, 0 , 0};
+                int start[3] = {0, 0 , 0};                                              // range of elements to be sent out
                 int end[3]   = {psize[0], psize[1], psize[2]};
 
                 if (dir % 2 == 0){
@@ -145,14 +168,14 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
         MPI_Neighbor_alltoallv(x_out, scounts, sdispls, MPI_DOUBLE, x_in, rcounts, rdispls, MPI_DOUBLE, comm_laplacian); 
 
 
-        // assembly x_in        
+        // assemble x_in        
         count = 0;
         order = 0;
-        for (dir = 0; dir < 6; dir ++){
+        for (dir = 0; dir < 6; dir ++){                                                 // received from right, left, front, back, up, down neighbors
             sum = 0;
             for (layer = 0; layer < system->rec_layers[dir]; layer ++){
 
-                int start[3] = {FDn, FDn, FDn};
+                int start[3] = {FDn, FDn, FDn};                                         // range to be placed in x_ghosted
                 int end[3]   = {FDn + psize[0], FDn + psize[1], FDn + psize[2]};
 
                 sum += system->rec_counts[order];
@@ -175,7 +198,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
         for (k = 0; k < psize[2]; k++)
             for (j = 0; j < psize[1]; j++)
                 for (i = 0; i < psize[0]; i++)
-                    x_ghosted(i + FDn, j + FDn, k + FDn) = phi(i, j, k);
+                    x_ghosted(i + FDn, j + FDn, k + FDn) = phi(i, j, k);                // assemble original nodes
 
 
         // update phi
@@ -204,7 +227,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
 
                     Lap_phi(i, j, k) = phi(i, j, k) * 3 * Lap_weights[0];
 
-                    for (order = 1; order < FDn + 1; order ++){
+                    for (order = 1; order < FDn + 1; order ++){                         // order * psize is used to make sure the index is nonnegative
 
                         Lap_phi(i, j, k) += (phi((i - order + order * psize[0]) % psize[0], j, k) + phi((i + order) % psize[0], j, k) 
                                            + phi(i, (j - order + order * psize[1]) % psize[1], k) + phi(i, (j + order) % psize[1], k) 
@@ -246,6 +269,7 @@ void Precondition(double diag, double *res, int Np)
  *          topology for parallel communication 
  */
 
+
 void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
     int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations)
 {
@@ -258,26 +282,26 @@ void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3]
 
     // First sending elements to others. Left, right, back, front, down, up 
     k = 0;
-    for (i = 0; i < 3; i++){
-        sign = -1;
+    for (i = 0; i < 3; i++){                                                    // loop over x, y, z axis
+        sign = -1;                                                              // sign indicates direction. e.g. left is -1. right is +1 
         Find_size_dir(rem[i], coords[i], psize[i], &small, &large);
 
-        for (j = 0; j < 2; j++){
+        for (j = 0; j < 2; j++){                                                // loop over 2 directions
             Vec_copy(neigh_coords, coords, 3);
             sum  = FDn;
             send_layers(i, j) = 0;
             neigh_size = 0;
 
             while (sum > 0){
-                neigh_coords[i] = (neigh_coords[i] + sign + np[i]) % np[i];
+                neigh_coords[i] = (neigh_coords[i] + sign + np[i]) % np[i];     // shift coordinates 
                 
                 send_layers(i,j)++;
                 
-                MPI_Cart_rank(cart, neigh_coords, send_neighs + k);
+                MPI_Cart_rank(cart, neigh_coords, send_neighs + k);             // find neighbor's rank
                 
                 *(send_counts + k) = Min(sum, psize[i]);
 
-                if (neigh_coords[i] < rem[i])
+                if (neigh_coords[i] < rem[i])                                   // find neighbor's size in this direction
                     neigh_size = large;
                 else
                     neigh_size = small;
@@ -290,7 +314,7 @@ void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3]
     }
 
 
-    // Then receiving elements from others. Right, left, front, back, up, down.
+    // Then receiving elements from others. Right, left, front, back, up, down. First sent, first received. 
     k = 0;
     for (i = 0; i < 3; i++){
         sign = +1;
@@ -328,8 +352,8 @@ void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3]
 #undef rec_layers
 
     for (i = 0; i < 6; i++){
-        *sources += rec_layers[i];
-        *destinations += send_layers[i];
+        *sources += rec_layers[i];                                              // number of total sources in topology
+        *destinations += send_layers[i];                                        // number of total destinations in topology
     }
 
     MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, *sources, rec_neighs, (int *)MPI_UNWEIGHTED, 
@@ -359,20 +383,20 @@ void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int 
     MPI_Cart_coords(*cart, rank, 3, coords);
 
     for (i = 0; i < 3; i++) {
+        if (ssize[i] < np[i]){
+            if(!rank) printf("Error: System size in %d direction is too small.\n", i);
+            MPI_Barrier(MPI_COMM_WORLD); 
+            exit(-1);
+        }
+
         rem[i] = ssize[i] % np[i];
         if (coords[i] < rem[i]){
             psize[i] = ssize[i] / np[i] + 1;
         }
         else {
             psize[i] = ssize[i] / np[i];
-            if (psize[i] == 0){
-                printf("Error: System size is too small.\n");
-            }
-
         }
     }
-    // MPI_Barrier(MPI_COMM_WORLD); 
-    // if (err == -1) MPI_Abort(MPI_COMM_WORLD, -1);
 }
 
 /**
@@ -426,6 +450,7 @@ void Initialize(POISSON *system, int max_layer)
 
     Get_block_origin_global_coords(system->coords, system->rem, system->psize, g_origin, &system->cart);
 
+    // generate right hand side by setting random seed = global index + 1 (> 0) for debug.
     for (k = 0; k < system->psize[2]; k ++)    
         for (j = 0; j < system->psize[1]; j ++)    
             for (i = 0; i < system->psize[0]; i ++) {
@@ -435,8 +460,8 @@ void Initialize(POISSON *system, int max_layer)
                 rhs_sum += system->rhs(i, j, k);
             }
 
-    MPI_Allreduce(&rhs_sum, &rhs_sum_global, 1, MPI_DOUBLE, MPI_SUM, system->cart); 
-    rhs_sum_global /= no_nodes;
+    MPI_Allreduce(&rhs_sum, &rhs_sum_global, 1, MPI_DOUBLE, MPI_SUM, system->cart);
+    rhs_sum_global /= (system->ssize[0] * system->ssize[1] * system->ssize[2]);
 
     for (i = 0; i < no_nodes; i++){
         system->rhs[i] -= rhs_sum_global;

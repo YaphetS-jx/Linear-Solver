@@ -60,7 +60,6 @@ void CG(POISSON *system,
 #endif
 
     tt1 = MPI_Wtime();
-    // PoissonResidual(system, x, r, system->np_x, system->FDn, comm);
     Lap_Vec_mult(system, -1.0/(4*M_PI), x, r, comm);
     tt2 = MPI_Wtime();
     tt += (tt2 - tt1);
@@ -90,9 +89,7 @@ void CG(POISSON *system,
 
     while(iter_count < max_iter && relres > tol){
         tt1 = MPI_Wtime();
-
-        // PoissonResidual(system, d, q, system->np_x, system->FDn, comm);           // q = A * d
-        Lap_Vec_mult(system, -1.0/(4*M_PI), d, q, comm);
+        Lap_Vec_mult(system, -1.0/(4*M_PI), d, q, comm);                    // q = A * d
 
         tt2 = MPI_Wtime();
         tt += (tt2 - tt1);
@@ -110,7 +107,6 @@ void CG(POISSON *system,
         if ((iter_count % 50) == 0)                                         // Restart every 50 cycles
         {
             tt1 = MPI_Wtime();
-            // PoissonResidual(system, x, r, system->np_x, system->FDn, comm);
             Lap_Vec_mult(system, -1.0/(4*M_PI), x, r, comm);
             tt2 = MPI_Wtime();
             tt += (tt2 - tt1);

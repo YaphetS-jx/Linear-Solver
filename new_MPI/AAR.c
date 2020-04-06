@@ -75,7 +75,6 @@ void AAR(POISSON *system,
     
     Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    // PoissonResidual(system, x, f, system->np_x, system->FDn, comm); 
     Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - f[i];                                              // f = rhs - Ax
@@ -115,7 +114,6 @@ void AAR(POISSON *system,
             for (i = 0; i < Np; i ++)
                 x[i] = x_old[i] + beta * f[i] - am_vec[i];                 // x = x_old + beta * f - am_vec
 
-            // PoissonResidual(system, x, f, system->np_x, system->FDn, comm); 
             Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
@@ -134,7 +132,6 @@ void AAR(POISSON *system,
             for (i = 0; i < Np; i++)
                 x[i] = x_old[i] + omega * f[i];                            // x = x + omega * res
 
-            // PoissonResidual(system, x, f, system->np_x, system->FDn, comm); 
             Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);   
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
