@@ -9,109 +9,9 @@
  * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
  */
 
-// #include  <math.h>
-// #include  <stdio.h>
-// #include  <stdlib.h> 
-// #include  <string.h>
-// #include  <mpi.h>
-// #include  <assert.h>
 
 #include "system.h"
 #include "tools.h"
-
-// #define M_PI 3.14159265358979323846
-// #define Min(a, b) (a < b ? a : b)
-
-// typedef struct {
-//     int FDn;
-//     int ssize[3];
-//     int psize[3];
-
-//     int np[3];
-//     int coords[3];
-//     int rem[3];
-
-//     int *send_neighs;
-//     int *rec_neighs;
-//     int *send_counts;
-//     int *rec_counts;
-//     int send_layers[6];
-//     int rec_layers[6];
-//     int sources;
-//     int destinations;
-
-//     double *phi;
-//     double *rhs;
-//     double *Lap_phi;
-
-//     double *coeff_lap;
-//     MPI_Comm comm_laplacian; 
-//     MPI_Comm cart;
-// }POISSON;
-
-// void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int rem[3], MPI_Comm comm, MPI_Comm *cart);
-
-// void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
-//     int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations);
-
-// void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer);
-
-// void Initialize(POISSON *system, int max_layer);
-
-// void Deallocate_memory(POISSON *system);
-
-// void Vec_copy(int *a, int *b, int n);
-
-// void Lap_coefficient(double *coeff_lap, int FDn);
-
-// void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_Comm comm_laplacian);
-
-// void Vec_2Norm(double *vec, int length, double *Norm, MPI_Comm comm);
-
-// void Find_size_dir(int rem, int coords, int psize, int *small, int *large);
-
-// void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart);
-
-// int main(int argc, char ** argv) 
-// {
-//     MPI_Init(&argc, &argv); 
-//     int rank, np_all, i, j, k, max_layer = 0;
-
-//     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-//     MPI_Comm_size(MPI_COMM_WORLD, &np_all); 
-
-//     POISSON *system = malloc(sizeof(POISSON));
-//     assert(system != NULL);
-
-//     system->ssize[0] = 6;
-//     system->ssize[1] = 6;
-//     system->ssize[2] = 6;
-//     system->FDn = 3;
-
-//     // Compute range of each process
-//     Processor_Domain(system->ssize, system->psize, system->np, system->coords, system->rem, MPI_COMM_WORLD, &system->cart); 
-    
-//     Max_layer(system->ssize, system->np, system->FDn, &max_layer);
-
-//     Initialize(system, max_layer);
-    
-//     Comm_topologies(system->FDn, system->psize, system->coords, system->rem, system->np, system->cart, &system->comm_laplacian,
-//         system->send_neighs, system->rec_neighs, system->send_counts, system->rec_counts, system->send_layers, system->rec_layers, &system->sources, &system->destinations);
-
-//     Lap_Vec_mult(system, -1.0/(4*M_PI), system->phi, system->Lap_phi, system->comm_laplacian);
-
-//     double norm;
-//     Vec_2Norm(system->phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
-//     if(rank == 0) printf("x_norm: %f\n", norm);
-
-//     Vec_2Norm(system->Lap_phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
-//     if(rank == 0) printf("ax_norm: %f\n", norm);
-    
-//     Deallocate_memory(system);
-    
-//     MPI_Finalize(); 
-//     return 0;
-// }
 
 /**
  * @brief   CheckInputs
@@ -613,21 +513,6 @@ void Deallocate_memory(POISSON *system)
 
     free(system);
 }
-
-// void Vec_2Norm(double *vec, int length, double *Norm, MPI_Comm comm)
-// {   
-//     int i;
-//     double norm = 0;
-//     /////////////////////////////////////////////////////////
-
-//     for (i = 0; i < length; i++){
-//         norm += vec[i] * vec[i];
-//     }
-
-//     MPI_Allreduce(&norm, Norm, 1, MPI_DOUBLE, MPI_SUM, comm);
-
-//     *Norm = sqrt(*Norm);
-// }
 
 
 /**
