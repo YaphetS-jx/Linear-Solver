@@ -1,104 +1,157 @@
-/* For parallel 3-d Poisson system*/
-#include  <math.h>
-#include  <stdio.h>
-#include  <stdlib.h> 
-#include  <string.h>
-#include  <mpi.h>
-#include  <assert.h>
+/**
+ * @file    system.c
+ * @brief   This file contains functions for linear system, residual 
+ *          function and precondition function.
+ *
+ * @author  Xin Jing  < xjing30@gatech.edu>
+ *          Phanish Suryanarayana  < phanish.suryanarayana@ce.gatech.edu>
+ * 
+ * Copyright (c) 2020 Material Physics & Mechanics Group at Georgia Tech.
+ */
+
+// #include  <math.h>
+// #include  <stdio.h>
+// #include  <stdlib.h> 
+// #include  <string.h>
+// #include  <mpi.h>
+// #include  <assert.h>
+
+#include "system.h"
+#include "tools.h"
 
 // #define M_PI 3.14159265358979323846
-#define Min(a, b) (a < b ? a : b)
+// #define Min(a, b) (a < b ? a : b)
 
-typedef struct {
-    int FDn;
-    int ssize[3];
-    int psize[3];
+// typedef struct {
+//     int FDn;
+//     int ssize[3];
+//     int psize[3];
 
-    int np[3];
-    int coords[3];
-    int rem[3];
+//     int np[3];
+//     int coords[3];
+//     int rem[3];
 
-    int *send_neighs;
-    int *rec_neighs;
-    int *send_counts;
-    int *rec_counts;
-    int send_layers[6];
-    int rec_layers[6];
-    int sources;
-    int destinations;
+//     int *send_neighs;
+//     int *rec_neighs;
+//     int *send_counts;
+//     int *rec_counts;
+//     int send_layers[6];
+//     int rec_layers[6];
+//     int sources;
+//     int destinations;
 
-    double *phi;
-    double *rhs;
-    double *Lap_phi;
+//     double *phi;
+//     double *rhs;
+//     double *Lap_phi;
 
-    double *coeff_lap;
-    MPI_Comm comm_laplacian; 
-    MPI_Comm cart;
-}POISSON;
+//     double *coeff_lap;
+//     MPI_Comm comm_laplacian; 
+//     MPI_Comm cart;
+// }POISSON;
 
-void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int rem[3], MPI_Comm comm, MPI_Comm *cart);
+// void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int rem[3], MPI_Comm comm, MPI_Comm *cart);
 
-void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
-    int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations);
+// void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
+//     int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations);
 
-void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer);
+// void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer);
 
-void Initialize(POISSON *system, int max_layer);
+// void Initialize(POISSON *system, int max_layer);
 
-void Deallocate_memory(POISSON *system);
+// void Deallocate_memory(POISSON *system);
 
-void Vec_copy(int *a, int *b, int n);
+// void Vec_copy(int *a, int *b, int n);
 
-void Lap_coefficient(double *coeff_lap, int FDn);
+// void Lap_coefficient(double *coeff_lap, int FDn);
 
-void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_Comm comm_laplacian);
+// void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_Comm comm_laplacian);
 
-void Vec_2Norm(double *vec, int length, double *Norm, MPI_Comm comm);
+// void Vec_2Norm(double *vec, int length, double *Norm, MPI_Comm comm);
 
-void Find_size_dir(int rem, int coords, int psize, int *small, int *large);
+// void Find_size_dir(int rem, int coords, int psize, int *small, int *large);
 
-void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart);
+// void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart);
 
-int main(int argc, char ** argv) 
+// int main(int argc, char ** argv) 
+// {
+//     MPI_Init(&argc, &argv); 
+//     int rank, np_all, i, j, k, max_layer = 0;
+
+//     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
+//     MPI_Comm_size(MPI_COMM_WORLD, &np_all); 
+
+//     POISSON *system = malloc(sizeof(POISSON));
+//     assert(system != NULL);
+
+//     system->ssize[0] = 6;
+//     system->ssize[1] = 6;
+//     system->ssize[2] = 6;
+//     system->FDn = 3;
+
+//     // Compute range of each process
+//     Processor_Domain(system->ssize, system->psize, system->np, system->coords, system->rem, MPI_COMM_WORLD, &system->cart); 
+    
+//     Max_layer(system->ssize, system->np, system->FDn, &max_layer);
+
+//     Initialize(system, max_layer);
+    
+//     Comm_topologies(system->FDn, system->psize, system->coords, system->rem, system->np, system->cart, &system->comm_laplacian,
+//         system->send_neighs, system->rec_neighs, system->send_counts, system->rec_counts, system->send_layers, system->rec_layers, &system->sources, &system->destinations);
+
+//     Lap_Vec_mult(system, -1.0/(4*M_PI), system->phi, system->Lap_phi, system->comm_laplacian);
+
+//     double norm;
+//     Vec_2Norm(system->phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
+//     if(rank == 0) printf("x_norm: %f\n", norm);
+
+//     Vec_2Norm(system->Lap_phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
+//     if(rank == 0) printf("ax_norm: %f\n", norm);
+    
+//     Deallocate_memory(system);
+    
+//     MPI_Finalize(); 
+//     return 0;
+// }
+
+/**
+ * @brief   CheckInputs
+ *
+ *          Read and set parameters from command line
+ */
+
+void CheckInputs(POISSON *system, int argc, char ** argv)  
 {
-    MPI_Init(&argc, &argv); 
-    int rank, np_all, i, j, k, max_layer = 0;
-
+    int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-    MPI_Comm_size(MPI_COMM_WORLD, &np_all); 
 
-    POISSON *system = malloc(sizeof(POISSON));
-    assert(system != NULL);
+    if (rank  ==  0) {
+        printf("*************************************************************************** \n"); 
+        printf("                     AAR, PGR and PL2R linear solver\n"); 
+        printf("*************************************************************************** \n"); 
+        char* c_time_str; 
+        time_t current_time = time(NULL); 
+        c_time_str = ctime(&current_time);   
+        printf("Starting time: %s \n", c_time_str); 
+    }
 
-    system->ssize[0] = 6;
-    system->ssize[1] = 6;
-    system->ssize[2] = 6;
-    system->FDn = 3;
-
-    // Compute range of each process
-    Processor_Domain(system->ssize, system->psize, system->np, system->coords, system->rem, MPI_COMM_WORLD, &system->cart); 
-    
-    Max_layer(system->ssize, system->np, system->FDn, &max_layer);
-
-    Initialize(system, max_layer);
-    
-    Comm_topologies(system->FDn, system->psize, system->coords, system->rem, system->np, system->cart, &system->comm_laplacian,
-        system->send_neighs, system->rec_neighs, system->send_counts, system->rec_counts, system->send_layers, system->rec_layers, &system->sources, &system->destinations);
-
-    Lap_Vec_mult(system, -1.0/(4*M_PI), system->phi, system->Lap_phi, system->comm_laplacian);
-
-    double norm;
-    Vec_2Norm(system->phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
-    if(rank == 0) printf("x_norm: %f\n", norm);
-
-    Vec_2Norm(system->Lap_phi, system->psize[0] * system->psize[1] * system->psize[2], &norm, system->comm_laplacian);
-    if(rank == 0) printf("ax_norm: %f\n", norm);
-    
-    Deallocate_memory(system);
-    
-    MPI_Finalize(); 
-    return 0;
+    if (argc !=  6) {
+        if (rank  ==  0) printf("Wrong inputs"); 
+        exit(-1); 
+    } else {
+        system->solver_tol = atof(argv[1]); 
+        system->m = atof(argv[2]); 
+        system->p = atof(argv[3]); 
+        system->omega = atof(argv[4]); 
+        system->beta = atof(argv[5]); 
+    }
 }
+
+
+/**
+ * @brief   Lap_Vec_mult
+ *
+ *          Laplacian Matrix multiply a Vector. a * Lap * vector
+ */
 
 void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_Comm comm_laplacian)
 {
@@ -271,6 +324,28 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
     free(Lap_weights);
 }
 
+
+/**
+ * @brief   Precondition
+ *
+ *          Precondition function. This is Jacobi preconditioner
+ */
+
+void Precondition(double diag, double *res, int Np)
+{
+    int i;
+    for (i = 0; i < Np; i ++)
+        res[i] /= diag;
+}
+
+
+/**
+ * @brief   Comm_topologies
+ *
+ *          Create base Cartesian topology and efficient distributed graph 
+ *          topology for parallel communication 
+ */
+
 void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
     int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations)
 {
@@ -278,7 +353,7 @@ void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3]
 #define rec_layers(i,j)   rec_layers[(i)*2+(j)]
 
     int i, j, k, sum, sign, neigh_size, large, small, reorder = 0;
-    int neigh_coords[3], scale[3];
+    int neigh_coords[3];
     //////////////////////////////////////////////////////////////////////
 
     // First sending elements to others. Left, right, back, front, down, up 
@@ -361,11 +436,16 @@ void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3]
         *destinations, send_neighs, (int *)MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, comm_laplacian); 
 }
 
+/**
+ * @brief   Processor_domain
+ *
+ *          Divide each domain based on the number of processes in each direction
+ */
 
 void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int rem[3], MPI_Comm comm, MPI_Comm *cart)
 {
     int i, rank, size, reorder = 0;
-    int period[3] = {1, 1, 1}, neigh_coords[3];
+    int period[3] = {1, 1, 1};
     /////////////////////////////////////////////////////
 
     MPI_Comm_size(comm, &size); 
@@ -395,6 +475,12 @@ void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int 
     // if (err == -1) MPI_Abort(MPI_COMM_WORLD, -1);
 }
 
+/**
+ * @brief   Max_layer
+ *
+ *          Estimate the upper bound of layers for receiving and send elements
+ */
+
 void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer)
 {
     int i;
@@ -405,9 +491,20 @@ void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer)
     }
 }
 
+
+/**
+ * @brief   Initialize
+ *
+ *          Allocate memory space for variables and generate the initial guess
+ */
+
+
 void Initialize(POISSON *system, int max_layer)
 {
+#define rhs(i, j, k) rhs[i + j * system->psize[0] + k * system->psize[0] * system->psize[1]]
+
     int i, j, k, g_origin[3], g_ind, no_nodes;
+    double rhs_sum = 0, rhs_sum_global = 0;
     ////////////////////////////////////////////////////////////
 
     system->send_neighs = (int*) calloc(max_layer, sizeof(int));
@@ -433,14 +530,31 @@ void Initialize(POISSON *system, int max_layer)
         for (j = 0; j < system->psize[1]; j ++)    
             for (i = 0; i < system->psize[0]; i ++) {
                 g_ind = (g_origin[0] + i) + (g_origin[1] + j) * system->ssize[0] + (g_origin[2] + k) * system->ssize[0] * system->ssize[1];
-                // srand(g_ind + 1);
-                system->phi[i + j * system->psize[0] + k * system->psize[0] * system->psize[1]] = g_ind * 1.0;
+                srand(g_ind + 1);
+                system->rhs(i, j, k) = (double)(rand()) / (double)(RAND_MAX); 
+                rhs_sum += system->rhs(i, j, k);
             }
+
+    MPI_Allreduce(&rhs_sum, &rhs_sum_global, 1, MPI_DOUBLE, MPI_SUM, system->cart); 
+    rhs_sum_global /= no_nodes;
+
+    for (i = 0; i < no_nodes; i++){
+        system->rhs[i] -= rhs_sum_global;
+        system->phi[i] = 1.0;
+    }
 
     system->sources = 0;
     system->destinations = 0;
+
+#undef rhs
 }
 
+
+/**
+ * @brief   Lap_coefficient
+ *
+ *          Calculate the finite difference coefficients for 1 dimensional Laplacian Matrix with order FDn
+ */
 
 void Lap_coefficient(double *coeff_lap, int FDn)
 {
@@ -462,12 +576,25 @@ void Lap_coefficient(double *coeff_lap, int FDn)
     }
 }
 
+
+/**
+ * @brief   Vec_copy
+ *
+ *          Copy the first n elements of vector b to vector a
+ */
+
 void Vec_copy(int *a, int *b, int n)
 {
     for (int i = 0; i < n; i++)
         a[i] = b[i];
 }
 
+
+/**
+ * @brief   Deallocate_memory
+ *
+ *          Free all previously allocated memory space
+ */
 
 void Deallocate_memory(POISSON *system)
 {
@@ -487,20 +614,27 @@ void Deallocate_memory(POISSON *system)
     free(system);
 }
 
-void Vec_2Norm(double *vec, int length, double *Norm, MPI_Comm comm)
-{   
-    int i;
-    double norm = 0;
-    /////////////////////////////////////////////////////////
+// void Vec_2Norm(double *vec, int length, double *Norm, MPI_Comm comm)
+// {   
+//     int i;
+//     double norm = 0;
+//     /////////////////////////////////////////////////////////
 
-    for (i = 0; i < length; i++){
-        norm += vec[i] * vec[i];
-    }
+//     for (i = 0; i < length; i++){
+//         norm += vec[i] * vec[i];
+//     }
 
-    MPI_Allreduce(&norm, Norm, 1, MPI_DOUBLE, MPI_SUM, comm);
+//     MPI_Allreduce(&norm, Norm, 1, MPI_DOUBLE, MPI_SUM, comm);
 
-    *Norm = sqrt(*Norm);
-}
+//     *Norm = sqrt(*Norm);
+// }
+
+
+/**
+ * @brief   Get_block_origin_global_coords
+ *
+ *          Get global coordinates of origin in each block
+ */
 
 void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart)
 {
@@ -521,6 +655,12 @@ void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int
     }
 }
 
+
+/**
+ * @brief   Find_size_dir
+ *
+ *          Find the possible sizes (small and large) in one direction
+ */
 
 void Find_size_dir(int rem, int coords, int psize, int *small, int *large)
 {   
