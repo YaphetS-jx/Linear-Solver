@@ -15,8 +15,8 @@
 #include "system.h"
 #include "tools.h"
 
-void PGR(DS* pAAR,
-        void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
+void PGR(POISSON *system,
+        void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
         void (*Precondition)(double, double *, int),
         double *x, double *rhs, double omega, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm_dist_graph_cart);

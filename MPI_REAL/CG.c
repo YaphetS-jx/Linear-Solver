@@ -28,11 +28,10 @@
  */
 
 
-void CG(DS* pAAR,
-    void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
-    void (*Precondition)(double, double *, int),
-    int DMnd, double *x, double *b, double tol, int max_iter, MPI_Comm comm
-)
+void CG(POISSON *system,
+        void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
+        void (*Precondition)(double, double *, int),
+        int DMnd, double *x, double *b, double tol, int max_iter, MPI_Comm comm)
 {
     if (comm == MPI_COMM_NULL) return;
 
@@ -61,7 +60,7 @@ void CG(DS* pAAR,
 #endif
 
     tt1 = MPI_Wtime();
-    PoissonResidual(pAAR, x, r, pAAR->np_x, pAAR->FDn, comm);
+    Lap_Vec_mult(system, -1.0/(4*M_PI), x, r, comm);
     tt2 = MPI_Wtime();
     tt += (tt2 - tt1);
 
@@ -71,7 +70,7 @@ void CG(DS* pAAR,
     }
 
     if (Precondition != NULL)
-        Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), d, DMnd);              // Jacobi precondition
+        Precondition(-(3*system->coeff_lap[0]/4/M_PI), d, DMnd);              // Jacobi precondition
 
     t1 = MPI_Wtime();
 
@@ -90,8 +89,7 @@ void CG(DS* pAAR,
 
     while(iter_count < max_iter && relres > tol){
         tt1 = MPI_Wtime();
-
-        PoissonResidual(pAAR, d, q, pAAR->np_x, pAAR->FDn, comm);           // q = A * d
+        Lap_Vec_mult(system, -1.0/(4*M_PI), d, q, comm);                    // q = A * d
 
         tt2 = MPI_Wtime();
         tt += (tt2 - tt1);
@@ -109,7 +107,7 @@ void CG(DS* pAAR,
         if ((iter_count % 50) == 0)                                         // Restart every 50 cycles
         {
             tt1 = MPI_Wtime();
-            PoissonResidual(pAAR, x, r, pAAR->np_x, pAAR->FDn, comm);
+            Lap_Vec_mult(system, -1.0/(4*M_PI), x, r, comm);
             tt2 = MPI_Wtime();
             tt += (tt2 - tt1);
 
@@ -126,7 +124,7 @@ void CG(DS* pAAR,
         }
 
         if (Precondition != NULL)
-            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), s, DMnd);          // Jacobi precondition
+            Precondition(-(3*system->coeff_lap[0]/4/M_PI), s, DMnd);          // Jacobi precondition
 
         delta_old = delta_new;
 

@@ -17,59 +17,69 @@
 #include  <time.h>   // CLOCK
 #include  <stdio.h>
 #include  <stdlib.h> 
-#include  <string.h>
 #include  <mpi.h>
 #include  <assert.h>
 
-#define M_PI 3.14159265358979323846
-#define min(a, b) ((a) < (b) ? (a) : (b))
+// #define M_PI 3.14159265358979323846
+#define Min(a, b) ((a) < (b) ? (a) : (b))
 
 typedef struct {
-    int ereg_s[3][26],ereg_e[3][26]; // 6 faces, 12 eges, 8 corners so 26 regions disjointly make the total communication region of proc domain. 3 denotes x,y,z dirs
-    int **eout_s,**eout_e,**ein_s,**ein_e,**stencil_sign,**edge_ind,*displs_send,*ncounts_send,*displs_recv,*ncounts_recv;
-}DS_LapInd;
+    int FDn;
+    int ssize[3];
+    int psize[3];
 
-typedef struct {
-    int nproc;                     /// <  Total number of processors
-    int nprocx,nprocy,nprocz;      /// <  Number of processors in each direction of domain
-    int pnode_s[3];                /// <  Processor domain start nodes' indices w.r.t main (starts from 0)
-    int pnode_e[3];                /// <  Processor domain end nodes' indices w.r.t main (starts from 0)
-    int np_x,np_y,np_z;            /// <  Number of finite difference nodes in each direction of processor domain
-    int FDn;                       /// <  Half-the order of finite difference
-    int n_int[3];                  /// <  Number of finite difference intervals in each direction of main domain
-    double* coeff_lap;             /// <  Finite difference coefficients for Laplacian
-    double ***rhs;                 /// <  Right hand side of the linear equation
-    double *rhs_v;                 /// <  Right hand side of the linear equation
-    double ***res;                 /// <  residual of linear equation
-    DS_LapInd LapInd;              /// <  Object for Laplacian communication information
-    double solver_tol;             /// <  Convergence tolerance for AAR solver
-    int solver_maxiter;            /// <  Maximum number of iterations allowed in the AAR solver
-    int *neighs_lap;               /// <  Array of neighboring processor ranks in the Laplacian stencil width from current processor
-    double omega;                  /// <  Richardson relaxation parameter
-    double beta;                   /// <  Anderson relaxation parameter
-    int m;                         /// <  Number of iterates in Anderson mixing = m+1
-    int p;                         /// <  AAR parameter. Anderson update done every p iteration of AAR solver
-    int non_blocking;              /// <  Option that indicates using non-blocking version of MPI command. 1=TRUE or 0=FALSE (for MPI collectives)
-    double ***phi;                 /// <  Unknown variable of the linear equation
-    double *phi_v;                 /// <  Unknown variable of the linear equation
-    double *phi_v2;                /// <  Unknown variable of the linear equation
-    double *phi_v3;                /// <  Unknown variable of the linear equation
-    double *phi_v4;                /// <  Unknown variable of the linear equation
-    MPI_Comm comm_laplacian;       /// <  Communicator topology for Laplacian
-}DS;
+    int np[3];
+    int coords[3];
+    int rem[3];
 
-void CheckInputs(DS* pAAR,int argc, char ** argv); 
-void Initialize(DS* pAAR); 
-void Read_input(DS* pAAR); 
-void Processor_domain(DS* pAAR);
-void Comm_topologies(DS* pAAR, int *pcoords);
-void Laplacian_Comm_Indices(DS* pAAR); 
-void EdgeIndicesForPoisson(DS* pAAR, int **eout_s,int **eout_e, int **ein_s,int **ein_e, int ereg_s[3][26],
-    int ereg_e[3][26],int **stencil_sign,int **edge_ind,int *displs_send,int *displs_recv,int *ncounts_send,int *ncounts_recv);
-void Deallocate_memory(DS* pAAR); 
-void PoissonResidual(DS *pAAR, double *phi_v, double *Ax, int np, int FDn, MPI_Comm comm_dist_graph_cart);
+    int *send_neighs;
+    int *rec_neighs;
+    int *send_counts;
+    int *rec_counts;
+    int send_layers[6];
+    int rec_layers[6];
+    int sources;
+    int destinations;
+
+    double *phi;
+    double *rhs;
+    double *Lap_phi;
+
+    double solver_tol;
+    int solver_maxiter;
+    int m;
+    int p;
+    double omega;
+    double beta;
+
+    double *coeff_lap;
+    MPI_Comm comm_laplacian; 
+    MPI_Comm cart;
+}POISSON;
+
+void CheckInputs(POISSON *system, int argc, char ** argv);
+
+void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int rem[3], MPI_Comm comm, MPI_Comm *cart);
+
+void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
+    int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations);
+
+void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer);
+
+void Initialize(POISSON *system, int max_layer);
+
+void Deallocate_memory(POISSON *system);
+
+void Vec_copy(int *a, int *b, int n);
+
+void Lap_coefficient(double *coeff_lap, int FDn);
+
+void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_Comm comm_laplacian);
+
 void Precondition(double diag, double *res, int Np);
-void convert_to_vector(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
-void convert_to_vector3d(double ***vector_3d, double *vector, int np_x, int np_y, int np_z, int dis);
+
+void Find_size_dir(int rem, int coords, int psize, int *small, int *large);
+
+void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart);
 
 #endif

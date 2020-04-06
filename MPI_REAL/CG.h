@@ -15,9 +15,9 @@
 #include "system.h"
 #include "tools.h"
 
-void CG(DS* pAAR,
-    void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
-    void (*Precondition)(double, double *, int),
-    int DMnd, double* x, double *b, double tol, int max_iter, MPI_Comm comm);
+void CG(POISSON *system,
+        void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
+        void (*Precondition)(double, double *, int),
+        int DMnd, double* x, double *b, double tol, int max_iter, MPI_Comm comm);
 
 #endif

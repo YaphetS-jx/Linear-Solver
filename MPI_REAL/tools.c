@@ -29,7 +29,7 @@ void Vector2Norm(double* Vec, int len, double* ResVal, MPI_Comm comm)
 
 
 /**
- * @brief   vector 2-norm
+ * @brief   Vector Dot Product of Vec1 and Vec2
  */
 
 void VectorDotProduct(double* Vec1, double* Vec2, int len, double* ResVal, MPI_Comm comm) 
@@ -51,7 +51,7 @@ void VectorDotProduct(double* Vec1, double* Vec2, int len, double* ResVal, MPI_C
 
 void PseudoInverseTimesVec(double **A, double *b, double *x, int m) 
 {
-    int i, j, k, ctr, jj; 
+    int i, j, k, jj; 
     double **U, **V, *w;  // A matrix in column major format as Ac. w is the array of singular values
     U = (double**) calloc(m, sizeof(double*));   
     V = (double**) calloc(m, sizeof(double*)); 

@@ -30,8 +30,8 @@
  *          comm     : MPI communicator
  */
 
-void PGR(DS* pAAR,
-        void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
+void PGR(POISSON *system,
+        void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
         void (*Precondition)(double, double *, int),
         double *x, double *rhs, double omega, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm) 
@@ -74,7 +74,7 @@ void PGR(DS* pAAR,
     
     Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm); 
+    Lap_Vec_mult(system, -1.0/(4*M_PI), x, Ax, comm);
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - Ax[i];                                             // f = rhs - Ax
 
@@ -88,7 +88,7 @@ void PGR(DS* pAAR,
     while (relres > tol && iter  <=  max_iter) {
         // Apply precondition here if it is provided by user
         if (Precondition != NULL)
-            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);           // Jacobi
+            Precondition(-(3*system->coeff_lap[0]/4/M_PI), f, Np);         // Jacobi
 
         for (i = 0; i < Np; i++){
             x_old[i] = x[i];                                               // x_old = x
@@ -96,7 +96,7 @@ void PGR(DS* pAAR,
             x[i] += (omega * f[i]);                                        // x = x + omega * f
         }
 
-        PoissonResidual(pAAR, x, Ax, pAAR->np_x, pAAR->FDn, comm); 
+        Lap_Vec_mult(system, -1.0/(4*M_PI), x, Ax, comm);
         for (i = 0; i < Np; i++)
             f[i] = rhs[i] - Ax[i];                                         // update f = rhs - Ax
 

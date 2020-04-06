@@ -32,8 +32,8 @@
  */
 
 
-void AAR(DS* pAAR,
-        void (*PoissonResidual)(DS*, double*, double*, int, int, MPI_Comm),
+void AAR(POISSON *system,
+        void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
         void (*Precondition)(double, double *, int),
         double *x, double *rhs, double omega, double beta, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm) 
@@ -75,7 +75,7 @@ void AAR(DS* pAAR,
     
     Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
+    Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - f[i];                                              // f = rhs - Ax
 
@@ -89,7 +89,7 @@ void AAR(DS* pAAR,
     while (relres > tol && iter  <=  max_iter) {
         // Apply precondition here if it is provided by user
         if (Precondition != NULL)
-            Precondition(-(3*pAAR->coeff_lap[0]/4/M_PI), f, Np);           // f = inv(M) * f
+            Precondition(-(3*system->coeff_lap[0]/4/M_PI), f, Np);           // f = inv(M) * f
 
         if(iter>1) {
             col = ((iter-2) % m); 
@@ -114,7 +114,7 @@ void AAR(DS* pAAR,
             for (i = 0; i < Np; i ++)
                 x[i] = x_old[i] + beta * f[i] - am_vec[i];                 // x = x_old + beta * f - am_vec
 
-            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm); 
+            Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
 
@@ -132,7 +132,7 @@ void AAR(DS* pAAR,
             for (i = 0; i < Np; i++)
                 x[i] = x_old[i] + omega * f[i];                            // x = x + omega * res
 
-            PoissonResidual(pAAR, x, f, pAAR->np_x, pAAR->FDn, comm);    
+            Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);   
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
 
