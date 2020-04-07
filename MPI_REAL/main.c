@@ -56,7 +56,8 @@ int main(int argc, char ** argv)
     // start tests
     if (!rank) fp = fopen("time.txt", "w");
     no_nodes = system->psize[0] * system->psize[1] * system->psize[2];
-    no_tests = 1;
+
+    no_tests = 50;
 
     for (j = 0; j < no_tests; j++){
         for (i = 0; i < no_nodes; i ++)
@@ -100,7 +101,7 @@ int main(int argc, char ** argv)
 
         if (!rank) printf("CG starts.\n"); 
         t0 = MPI_Wtime();
-        CG(system, Lap_Vec_mult, NULL,  no_nodes, system->phi, system->rhs, system->solver_tol, system->solver_maxiter, system->comm_laplacian);  
+        CG(system, Lap_Vec_mult, Precondition,  no_nodes, system->phi, system->rhs, system->solver_tol, system->solver_maxiter, system->comm_laplacian);  
         t1 = MPI_Wtime();
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         if (!rank) fprintf(fp, "%g\n", t1 - t0);

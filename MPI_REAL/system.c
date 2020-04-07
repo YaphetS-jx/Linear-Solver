@@ -88,6 +88,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
     int *sdispls, *rdispls, scale[3], *scounts, *rcounts;
     int psize[3] = {system->psize[0], system->psize[1], system->psize[2]};
     double *x_in, *x_out, *x_ghosted, *Lap_weights;
+    MPI_Request request;
     //////////////////////////////////////////////////////////////////////
 
     sources = system->sources;
@@ -165,7 +166,8 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
             }   
         }
 
-        MPI_Neighbor_alltoallv(x_out, scounts, sdispls, MPI_DOUBLE, x_in, rcounts, rdispls, MPI_DOUBLE, comm_laplacian); 
+        MPI_Ineighbor_alltoallv(x_out, scounts, sdispls, MPI_DOUBLE, x_in, rcounts, rdispls, MPI_DOUBLE, comm_laplacian, &request); 
+        MPI_Wait(&request, MPI_STATUS_IGNORE);
 
 
         // assemble x_in        
@@ -244,6 +246,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
     free(rdispls);
     free(scounts);
     free(rcounts);
+    free(x_ghosted);
     free(Lap_weights);
 }
 
@@ -456,7 +459,7 @@ void Initialize(POISSON *system, int max_layer)
             for (i = 0; i < system->psize[0]; i ++) {
                 g_ind = (g_origin[0] + i) + (g_origin[1] + j) * system->ssize[0] + (g_origin[2] + k) * system->ssize[0] * system->ssize[1];
                 srand(g_ind + 1);
-                system->rhs(i, j, k) = (double)(rand()) / (double)(RAND_MAX); 
+                system->rhs(i, j, k) = 2 * (double)(rand()) / (double)(RAND_MAX); 
                 rhs_sum += system->rhs(i, j, k);
             }
 
@@ -510,7 +513,9 @@ void Lap_coefficient(double *coeff_lap, int FDn)
 
 void Vec_copy(int *a, int *b, int n)
 {
-    for (int i = 0; i < n; i++)
+    int i;
+    
+    for (i = 0; i < n; i++)
         a[i] = b[i];
 }
 
