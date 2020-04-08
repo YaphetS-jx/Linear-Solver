@@ -19,6 +19,8 @@
  *          replaced by any user defined function 
  *          Precondition is for applying precondition, which could be replaced by any
  *          user defined precondition function
+ *
+ *          a        : constant for Lap_Vec_mult and precondition function
  *          x        : initial guess and final solution
  *          rhs      : right hand side of linear system, i.e. b
  *          omega    : relaxation parameter (for Richardson update)
@@ -34,7 +36,7 @@
 
 void AAR(POISSON *system,
         void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
-        void (*Precondition)(double, double *, int),
+        void (*Precondition)(double, double *, int), double a,
         double *x, double *rhs, double omega, double beta, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm) 
 {
@@ -75,7 +77,7 @@ void AAR(POISSON *system,
     
     Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);
+    Lap_Vec_mult(system, a, x, f, comm);
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - f[i];                                              // f = rhs - Ax
 
@@ -89,7 +91,7 @@ void AAR(POISSON *system,
     while (relres > tol && iter  <=  max_iter) {
         // Apply precondition here if it is provided by user
         if (Precondition != NULL)
-            Precondition(-(3*system->coeff_lap[0]/4/M_PI), f, Np);           // f = inv(M) * f
+            Precondition(a*(3*system->coeff_lap[0]), f, Np);           // f = inv(M) * f
 
         if(iter>1) {
             col = ((iter-2) % m); 
@@ -114,7 +116,7 @@ void AAR(POISSON *system,
             for (i = 0; i < Np; i ++)
                 x[i] = x_old[i] + beta * f[i] - am_vec[i];                 // x = x_old + beta * f - am_vec
 
-            Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);
+            Lap_Vec_mult(system, a, x, f, comm);
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
 
@@ -132,7 +134,7 @@ void AAR(POISSON *system,
             for (i = 0; i < Np; i++)
                 x[i] = x_old[i] + omega * f[i];                            // x = x + omega * res
 
-            Lap_Vec_mult(system, -1.0/(4*M_PI), x, f, comm);   
+            Lap_Vec_mult(system, a, x, f, comm);   
             for (i = 0; i < Np; i++)
                 f[i] = rhs[i] - f[i];                                      // f = rhs - Ax
 

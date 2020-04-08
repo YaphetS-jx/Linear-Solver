@@ -17,7 +17,7 @@
 
 void CG(POISSON *system,
         void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
-        void (*Precondition)(double, double *, int),
-        int DMnd, double* x, double *b, double tol, int max_iter, MPI_Comm comm);
+        void (*Precondition)(double, double *, int), double a,
+        double *x, double *b, int max_iter, double tol, int Np, MPI_Comm comm);
 
 #endif

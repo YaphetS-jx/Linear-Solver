@@ -17,7 +17,7 @@
 
 void AAR(POISSON *system, 
      void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
-     void (*Precondition)(double, double *, int),
+     void (*Precondition)(double, double *, int), double a,
      double *x, double *rhs, double omega, double beta, int m, int p, 
      int max_iter, double tol, int Np, MPI_Comm comm);
 

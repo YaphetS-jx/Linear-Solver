@@ -57,7 +57,7 @@ int main(int argc, char ** argv)
     if (!rank) fp = fopen("time.txt", "w");
     no_nodes = system->psize[0] * system->psize[1] * system->psize[2];
 
-    no_tests = 50;
+    no_tests = 1;
 
     for (j = 0; j < no_tests; j++){
         for (i = 0; i < no_nodes; i ++)
@@ -65,7 +65,7 @@ int main(int argc, char ** argv)
 
         if (!rank) printf("AAR starts.\n"); 
         t0 = MPI_Wtime();
-        AAR(system, Lap_Vec_mult, Precondition, system->phi, system->rhs, system->omega, system->beta, system->m, system->p, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
+        AAR(system, Lap_Vec_mult, Precondition, -1.0/(4*M_PI), system->phi, system->rhs, system->omega, system->beta, system->m, system->p, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
         t1 = MPI_Wtime();
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         if (!rank) fprintf(fp, "%g\n", t1 - t0);
@@ -77,7 +77,7 @@ int main(int argc, char ** argv)
 
         if (!rank) printf("PGR starts.\n"); 
         t0 = MPI_Wtime();
-        PGR(system, Lap_Vec_mult, Precondition, system->phi, system->rhs, system->omega, system->m, system->p, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
+        PGR(system, Lap_Vec_mult, Precondition, -1.0/(4*M_PI), system->phi, system->rhs, system->omega, system->m, system->p, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
         t1 = MPI_Wtime();
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         if (!rank) fprintf(fp, "%g\n", t1 - t0);
@@ -89,7 +89,7 @@ int main(int argc, char ** argv)
 
         if (!rank) printf("PL2R starts.\n"); 
         t0 = MPI_Wtime();
-        PL2R(system, Lap_Vec_mult, Precondition, system->phi, system->rhs, system->omega, system->m, system->p, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
+        PL2R(system, Lap_Vec_mult, Precondition, -1.0/(4*M_PI), system->phi, system->rhs, system->omega, system->m, system->p, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
         t1 = MPI_Wtime();
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         if (!rank) fprintf(fp, "%g\n", t1 - t0);
@@ -101,7 +101,7 @@ int main(int argc, char ** argv)
 
         if (!rank) printf("CG starts.\n"); 
         t0 = MPI_Wtime();
-        CG(system, Lap_Vec_mult, Precondition,  no_nodes, system->phi, system->rhs, system->solver_tol, system->solver_maxiter, system->comm_laplacian);  
+        CG(system, Lap_Vec_mult, Precondition, -1.0/(4*M_PI), system->phi, system->rhs, system->solver_maxiter, system->solver_tol, no_nodes, system->comm_laplacian);  
         t1 = MPI_Wtime();
         if (!rank) printf("\n*************************************************************************** \n\n"); 
         if (!rank) fprintf(fp, "%g\n", t1 - t0);

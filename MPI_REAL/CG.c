@@ -19,19 +19,21 @@
  *          replaced by any user defined function 
  *          Precondition is for applying precondition, which could be replaced by any
  *          user defined precondition function
- *          DMnd     : no. of elements in this domain
+ *
+ *          a        : constant for Lap_Vec_mult and precondition function
  *          x        : initial guess and final solution
  *          b        : right hand side of linear system
- *          tol      : convergence tolerance
  *          max_iter : maximum number of iterations
+ *          tol      : convergence tolerance
+ *          Np       : no. of elements in this domain
  *          comm     : MPI communicator
  */
 
 
 void CG(POISSON *system,
         void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
-        void (*Precondition)(double, double *, int),
-        int DMnd, double *x, double *b, double tol, int max_iter, MPI_Comm comm)
+        void (*Precondition)(double, double *, int), double a,
+        double *x, double *b, int max_iter, double tol, int Np, MPI_Comm comm)
 {
     if (comm == MPI_COMM_NULL) return;
 
@@ -42,17 +44,17 @@ void CG(POISSON *system,
 
     tt = 0;
     t=0;
-    r = (double *)malloc( DMnd * sizeof(double) );
-    d = (double *)malloc( DMnd * sizeof(double) );
-    s = (double *)malloc( DMnd * sizeof(double) );
-    q = (double *)malloc( DMnd * sizeof(double) );    
+    r = (double *)malloc( Np * sizeof(double) );
+    d = (double *)malloc( Np * sizeof(double) );
+    s = (double *)malloc( Np * sizeof(double) );
+    q = (double *)malloc( Np * sizeof(double) );    
     assert(r != NULL && d != NULL && q != NULL);
     
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
     t1 = MPI_Wtime();
-    Vector2Norm(b, DMnd, &b_2norm, comm); 
+    Vector2Norm(b, Np, &b_2norm, comm); 
     t2 = MPI_Wtime();
     t += t2 - t1;
 #ifdef DEBUG
@@ -60,24 +62,24 @@ void CG(POISSON *system,
 #endif
 
     tt1 = MPI_Wtime();
-    Lap_Vec_mult(system, -1.0/(4*M_PI), x, r, comm);
+    Lap_Vec_mult(system, a, x, r, comm);
     tt2 = MPI_Wtime();
     tt += (tt2 - tt1);
 
-    for (i = 0; i < DMnd; ++i){
+    for (i = 0; i < Np; ++i){
         r[i] = b[i] - r[i];                                                 // r = b - Ax 
         d[i] = r[i];                                                        // d = r
     }
 
     if (Precondition != NULL)
-        Precondition(-(3*system->coeff_lap[0]/4/M_PI), d, DMnd);              // Jacobi precondition
+        Precondition(a*(3*system->coeff_lap[0]), d, Np);              // Jacobi precondition
 
     t1 = MPI_Wtime();
 
-    VectorDotProduct(r, d, DMnd, &delta_new, comm);                         // delta_new = r' * d
+    VectorDotProduct(r, d, Np, &delta_new, comm);                         // delta_new = r' * d
 
     if (Precondition != NULL)
-        Vector2Norm(r, DMnd, &relres, comm);
+        Vector2Norm(r, Np, &relres, comm);
     else
         relres = sqrt(delta_new);                                           // relres = norm(r)
 
@@ -89,50 +91,50 @@ void CG(POISSON *system,
 
     while(iter_count < max_iter && relres > tol){
         tt1 = MPI_Wtime();
-        Lap_Vec_mult(system, -1.0/(4*M_PI), d, q, comm);                    // q = A * d
+        Lap_Vec_mult(system, a, d, q, comm);                    // q = A * d
 
         tt2 = MPI_Wtime();
         tt += (tt2 - tt1);
 
         t1 = MPI_Wtime();
-        VectorDotProduct(d, q, DMnd, &alpha, comm);                         // alpha = d' * q
+        VectorDotProduct(d, q, Np, &alpha, comm);                         // alpha = d' * q
         t2 = MPI_Wtime();
         t += t2 - t1;
 
         alpha = delta_new / alpha;                                          // alpha = (r' * d)/(d' * q)
 
-        for (i = 0; i < DMnd; ++i)
+        for (i = 0; i < Np; ++i)
             x[i] = x[i] + alpha * d[i];                                     // x = x + alpha * d
         
         if ((iter_count % 50) == 0)                                         // Restart every 50 cycles
         {
             tt1 = MPI_Wtime();
-            Lap_Vec_mult(system, -1.0/(4*M_PI), x, r, comm);
+            Lap_Vec_mult(system, a, x, r, comm);
             tt2 = MPI_Wtime();
             tt += (tt2 - tt1);
 
-            for (i = 0; i < DMnd; ++i){
+            for (i = 0; i < Np; ++i){
                 r[i] = b[i] - r[i];                                         // r = b - A * x
                 s[i] = r[i];                                                // s = r 
             }
             
         } else {
-            for (i = 0; i < DMnd; ++i){
+            for (i = 0; i < Np; ++i){
                 r[i] = r[i] - alpha * q[i];                                 // r = r - alpha * q
                 s[i] = r[i];                                                // s = r
             }
         }
 
         if (Precondition != NULL)
-            Precondition(-(3*system->coeff_lap[0]/4/M_PI), s, DMnd);          // Jacobi precondition
+            Precondition(a*(3*system->coeff_lap[0]), s, Np);          // Jacobi precondition
 
         delta_old = delta_new;
 
         t1 = MPI_Wtime();
-        VectorDotProduct(r, s, DMnd, &delta_new, comm);                     // delta_new = r' * s
+        VectorDotProduct(r, s, Np, &delta_new, comm);                     // delta_new = r' * s
 
         if (Precondition != NULL)
-            Vector2Norm(r, DMnd, &relres, comm);
+            Vector2Norm(r, Np, &relres, comm);
         else
             relres = sqrt(delta_new);                                       // relres = norm(r)
 
@@ -144,7 +146,7 @@ void CG(POISSON *system,
         t += t2 - t1;
 
         beta = delta_new / delta_old;
-        for (i = 0; i < DMnd; ++i)
+        for (i = 0; i < Np; ++i)
             d[i] = s[i] + beta * d[i];                                      // d = s + beta * d
 
         iter_count++;

@@ -19,6 +19,8 @@
  *          replaced by any user defined function 
  *          Precondition is for applying precondition, which could be replaced by any
  *          user defined precondition function
+ *
+ *          a        : constant for Lap_Vec_mult and precondition function
  *          x        : initial guess and final solution
  *          rhs      : right hand side of linear system, i.e. b
  *          omega    : relaxation parameter (for Richardson update)
@@ -32,7 +34,7 @@
 
 void PL2R(POISSON *system,
         void (*Lap_Vec_mult)(POISSON *, double, double *, double *, MPI_Comm),
-        void (*Precondition)(double, double *, int),
+        void (*Precondition)(double, double *, int), double a,
         double *x, double *rhs, double omega, int m, int p, 
         int max_iter, double tol, int Np, MPI_Comm comm) 
 {
@@ -74,7 +76,7 @@ void PL2R(POISSON *system,
     
     Vector2Norm(rhs, Np, &rhs_norm, comm); 
     tol *= rhs_norm;
-    Lap_Vec_mult(system, -1.0/(4*M_PI), x, Ax, comm);
+    Lap_Vec_mult(system, a, x, Ax, comm);
     for (i = 0; i < Np; i++)
         f[i] = rhs[i] - Ax[i];
 
@@ -88,7 +90,7 @@ void PL2R(POISSON *system,
     while (relres > tol && iter  <=  max_iter) {
         // Apply precondition here if it is provided by user
         if (Precondition != NULL)
-            Precondition(-(3*system->coeff_lap[0]/4/M_PI), f, Np);           // Jacobi
+            Precondition(a*(3*system->coeff_lap[0]), f, Np);           // Jacobi
 
         for (i = 0; i < Np; i++){
             x_old[i] = x[i];                                               // x_old = x
@@ -96,7 +98,7 @@ void PL2R(POISSON *system,
             x[i] += (omega * f[i]);                                        // x = x + omega * f
         }
 
-        Lap_Vec_mult(system, -1.0/(4*M_PI), x, Ax, comm);
+        Lap_Vec_mult(system, a, x, Ax, comm);
         for (i = 0; i < Np; i++)
             f[i] = rhs[i] - Ax[i];                                         // update f = rhs - Ax
 
