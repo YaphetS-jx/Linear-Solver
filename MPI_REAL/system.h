@@ -80,6 +80,6 @@ void Precondition(double diag, double *res, int Np);
 
 void Find_size_dir(int rem, int coords, int psize, int *small, int *large);
 
-void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart);
+void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3]);
 
 #endif

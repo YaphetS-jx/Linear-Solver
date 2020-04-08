@@ -451,7 +451,7 @@ void Initialize(POISSON *system, int max_layer)
     system->Lap_phi = (double*) calloc(no_nodes, sizeof(double)); 
     assert(system->phi != NULL && system->rhs != NULL && system->Lap_phi != NULL);
 
-    Get_block_origin_global_coords(system->coords, system->rem, system->psize, g_origin, &system->cart);
+    Get_block_origin_global_coords(system->coords, system->rem, system->psize, g_origin);
 
     // generate right hand side by setting random seed = global index + 1 (> 0) for debug.
     for (k = 0; k < system->psize[2]; k ++)    
@@ -551,7 +551,7 @@ void Deallocate_memory(POISSON *system)
  *          Get global coordinates of origin in each block
  */
 
-void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3], MPI_Comm *cart)
+void Get_block_origin_global_coords(int coords[3], int rem[3], int psize[3], int g_origin[3])
 {
     int i, j, small, large;
     ///////////////////////////////////////////////////////////////
