@@ -105,7 +105,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
     rdispls = (int*) calloc(sources,      sizeof(int));                                 // receive displacements
     x_ghosted   = (double*) calloc(ghosted_size, sizeof(double));                       // ghosted x for assembly
     Lap_weights = (double*) calloc((FDn + 1),    sizeof(double));                       // a * Lap coefficients
-    assert(scounts != NULL && rcounts != NULL && sdispls != NULL && rdispls != NULL && x_ghosted != NULL && Lap_weights);
+    assert(scounts != NULL && rcounts != NULL && sdispls != NULL && rdispls != NULL && x_ghosted != NULL && Lap_weights != NULL);
 
     // update coefficient
     for (i = 0; i < FDn + 1; i++){
