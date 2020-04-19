@@ -38,8 +38,13 @@ typedef struct {
     int *rec_counts;
     int send_layers[6];
     int rec_layers[6];
-    int sources;
-    int destinations;
+
+    int *scounts;
+    int *sdispls; 
+    int *rcounts;
+    int *rdispls;
+    int n_in;
+    int n_out;
 
     double *phi;
     double *rhs;
@@ -61,8 +66,8 @@ void CheckInputs(POISSON *system, int argc, char ** argv);
 
 void Processor_Domain(int ssize[3], int psize[3], int np[3], int coords[3], int rem[3], MPI_Comm comm, MPI_Comm *cart);
 
-void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
-    int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations);
+void Comm_topologies(POISSON *system, int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
+    int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *n_in, int *n_out);
 
 void Max_layer(int ssize[3], int np[3], int FDn, int *max_layer);
 

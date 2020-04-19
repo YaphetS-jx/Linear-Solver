@@ -17,8 +17,8 @@ This code is for solving real-valued systems of equations using the AAR, PGR, PL
     
 (5) Running the code: (e.g. for 8 processors)
 
-        #mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n np ./petsc_real pc tol  m  p  omega beta 
-         mpirun -env MV2_ENABLE_AFFINITY=1 -env MV2_CPU_BINDING_POLICY=bunch -n 64 ./petsc_real 0  1e-6 13 11 1.0   0.9  -log_summary>test.out
+        #mpirun -np np ./petsc_real pc tol  m  p  omega beta 
+         mpirun -np 64 ./petsc_real 0  1e-6 13 11 1.0   0.9  -log_summary>test.out
 	   
 (6) The executable (petsc_real) is created in the root directory and the source code is in main.c system.c(.h) tools.c(h) AAR_Real.c(.h) PGR_Real.c(.h) PL2R_Real.c(.h)
 

@@ -83,29 +83,20 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
 #define Lap_phi(i, j, k) Lap_phi[(i) + (j) * psize[0] + (k) * psize[0] * psize[1]]
 #define x_ghosted(i, j, k) x_ghosted[(i) + (j) * (psize[0] + 2 * FDn) + (k) * (psize[0] + 2 * FDn) * (psize[1] + 2 * FDn)]
 
-    int i, j, k, n_in = 0, n_out = 0, sources, destinations, dir, layer;
-    int count, ghosted_size, order, FDn, sum, size;
-    int *sdispls, *rdispls, scale[3], *scounts, *rcounts;
+    int i, j, k, dir, layer, count, ghosted_size, order, FDn, sum, size;
     int psize[3] = {system->psize[0], system->psize[1], system->psize[2]};
     double *x_in, *x_out, *x_ghosted, *Lap_weights;
     MPI_Request request;
     //////////////////////////////////////////////////////////////////////
-
-    sources = system->sources;
-    destinations = system->destinations;
 
     FDn = system->FDn;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size); 
 
     ghosted_size = (psize[0] + 2 * FDn) * (psize[1] + 2 * FDn) * (psize[2] + 2 * FDn);
-    scounts = (int*) calloc(destinations, sizeof(int));                                 // send counts of elements
-    rcounts = (int*) calloc(sources,      sizeof(int));                                 // receive counts of elements
-    sdispls = (int*) calloc(destinations, sizeof(int));                                 // send displacements
-    rdispls = (int*) calloc(sources,      sizeof(int));                                 // receive displacements
     x_ghosted   = (double*) calloc(ghosted_size, sizeof(double));                       // ghosted x for assembly
     Lap_weights = (double*) calloc((FDn + 1),    sizeof(double));                       // a * Lap coefficients
-    assert(scounts != NULL && rcounts != NULL && sdispls != NULL && rdispls != NULL && x_ghosted != NULL && Lap_weights != NULL);
+    assert(x_ghosted != NULL && Lap_weights != NULL);
 
     // update coefficient
     for (i = 0; i < FDn + 1; i++){
@@ -114,34 +105,8 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
 
     if (size > 1)                                                                       // parallel communication
     {
-        scale[0] = psize[1] * psize[2];
-        scale[1] = psize[0] * psize[2];
-        scale[2] = psize[0] * psize[1];
-
-        k = 0;
-        for (i = 0; i < 6; i++)                                                         // loop over 6 directions (left, right, back, front, down, up)
-            for (j = 0; j < system->send_layers[i]; j++){
-                scounts[k] = system->send_counts[k] * scale[i / 2];                     // scaled by size of other 2 axis 
-                n_out += scounts[k];
-
-                if (k > 0)
-                    sdispls[k] = sdispls[k - 1] + scounts[k - 1];
-                k++;
-            }
-
-        k = 0;
-        for (i = 0; i < 6; i++)
-            for (j = 0; j < system->rec_layers[i]; j++){
-                rcounts[k] = system->rec_counts[k] * scale[i / 2];
-                n_in += rcounts[k];
-                
-                if (k > 0)
-                    rdispls[k] = rdispls[k - 1] + rcounts[k - 1];
-                k++;
-            }
-
-        x_in  = (double*) calloc(n_in,  sizeof(double));                                // number of elements received from each neighbor 
-        x_out = (double*) calloc(n_out, sizeof(double));                                // number of elements sent to each neighbor
+        x_in  = (double*) calloc(system->n_in,  sizeof(double));                        // number of elements received from each neighbor 
+        x_out = (double*) calloc(system->n_out, sizeof(double));                        // number of elements sent to each neighbor
         assert(x_in != NULL && x_out != NULL);
 
         // assemble x_out
@@ -166,7 +131,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
             }   
         }
 
-        MPI_Ineighbor_alltoallv(x_out, scounts, sdispls, MPI_DOUBLE, x_in, rcounts, rdispls, MPI_DOUBLE, comm_laplacian, &request); 
+        MPI_Ineighbor_alltoallv(x_out, system->scounts, system->sdispls, MPI_DOUBLE, x_in, system->rcounts, system->rdispls, MPI_DOUBLE, comm_laplacian, &request); 
         MPI_Wait(&request, MPI_STATUS_IGNORE);
 
 
@@ -242,10 +207,7 @@ void Lap_Vec_mult(POISSON *system, double a, double *phi, double *Lap_phi, MPI_C
 #undef phi
 #undef x_ghosted
 #undef Lap_phi
-    free(sdispls);
-    free(rdispls);
-    free(scounts);
-    free(rcounts);
+
     free(x_ghosted);
     free(Lap_weights);
 }
@@ -273,14 +235,14 @@ void Precondition(double diag, double *res, int Np)
  */
 
 
-void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
-    int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *sources, int *destinations)
+void Comm_topologies(POISSON *system, int FDn, int psize[3], int coords[3], int rem[3], int np[3], MPI_Comm cart, MPI_Comm *comm_laplacian,
+    int *send_neighs, int *rec_neighs, int *send_counts, int *rec_counts, int send_layers[6], int rec_layers[6], int *n_in, int *n_out)
 {
 #define send_layers(i,j) send_layers[(i)*2+(j)]
 #define rec_layers(i,j)   rec_layers[(i)*2+(j)]
 
     int i, j, k, sum, sign, neigh_size, large, small, reorder = 0;
-    int neigh_coords[3];
+    int neigh_coords[3], scale[3], sources = 0, destinations = 0;
     //////////////////////////////////////////////////////////////////////
 
     // First sending elements to others. Left, right, back, front, down, up 
@@ -355,12 +317,46 @@ void Comm_topologies(int FDn, int psize[3], int coords[3], int rem[3], int np[3]
 #undef rec_layers
 
     for (i = 0; i < 6; i++){
-        *sources += rec_layers[i];                                              // number of total sources in topology
-        *destinations += send_layers[i];                                        // number of total destinations in topology
+        sources += rec_layers[i];                                               // number of total sources in topology
+        destinations += send_layers[i];                                         // number of total destinations in topology
     }
 
-    MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, *sources, rec_neighs, (int *)MPI_UNWEIGHTED, 
-        *destinations, send_neighs, (int *)MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, comm_laplacian); 
+    MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, sources, rec_neighs, (int *)MPI_UNWEIGHTED, 
+        destinations, send_neighs, (int *)MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, comm_laplacian); 
+
+    system->scounts = (int*) calloc(destinations, sizeof(int));                 // send counts of elements
+    system->rcounts = (int*) calloc(sources,      sizeof(int));                 // receive counts of elements
+    system->sdispls = (int*) calloc(destinations, sizeof(int));                 // send displacements
+    system->rdispls = (int*) calloc(sources,      sizeof(int));                 // receive displacements
+
+    scale[0] = psize[1] * psize[2];
+    scale[1] = psize[0] * psize[2];
+    scale[2] = psize[0] * psize[1];
+
+    *n_in  = 0; 
+    *n_out = 0;
+
+    k = 0;
+    for (i = 0; i < 6; i++)                                                     // loop over 6 directions (left, right, back, front, down, up)
+        for (j = 0; j < send_layers[i]; j++){
+            system->scounts[k] = send_counts[k] * scale[i / 2];                        // scaled by size of other 2 axis 
+            *n_out += system->scounts[k];
+
+            if (k > 0)
+                system->sdispls[k] = system->sdispls[k - 1] + system->scounts[k - 1];
+            k++;
+        }
+
+    k = 0;
+    for (i = 0; i < 6; i++)
+        for (j = 0; j < rec_layers[i]; j++){
+            system->rcounts[k] = rec_counts[k] * scale[i / 2];
+            *n_in += system->rcounts[k];
+            
+            if (k > 0)
+                system->rdispls[k] = system->rdispls[k - 1] + system->rcounts[k - 1];
+            k++;
+        }
 }
 
 /**
@@ -471,9 +467,6 @@ void Initialize(POISSON *system, int max_layer)
         system->phi[i] = 1.0;
     }
 
-    system->sources = 0;
-    system->destinations = 0;
-
 #undef rhs
 }
 
@@ -532,6 +525,11 @@ void Deallocate_memory(POISSON *system)
     free(system->rec_neighs);
     free(system->send_counts);
     free(system->rec_counts);
+
+    free(system->scounts);
+    free(system->sdispls);
+    free(system->rcounts);
+    free(system->rdispls);
 
     free(system->coeff_lap);
     free(system->phi);

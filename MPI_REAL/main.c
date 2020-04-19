@@ -50,8 +50,8 @@ int main(int argc, char ** argv)
     Initialize(system, max_layer);
 
     // Create distributed graph topology for parallel communication
-    Comm_topologies(system->FDn, system->psize, system->coords, system->rem, system->np, system->cart, &system->comm_laplacian,
-        system->send_neighs, system->rec_neighs, system->send_counts, system->rec_counts, system->send_layers, system->rec_layers, &system->sources, &system->destinations);
+    Comm_topologies(system, system->FDn, system->psize, system->coords, system->rem, system->np, system->cart, &system->comm_laplacian,
+        system->send_neighs, system->rec_neighs, system->send_counts, system->rec_counts, system->send_layers, system->rec_layers, &system->n_in, &system->n_out);
 
     // start tests
     if (!rank) fp = fopen("time.txt", "w");

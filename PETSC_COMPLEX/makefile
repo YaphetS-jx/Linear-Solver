@@ -8,12 +8,12 @@ OBJSC = ./main.o system.o tools.o AAR_Complex.o PGR_Complex.o PL2R_Complex.o
 LIBBASE = ./petsc_complex
 
 # For PETSC 3.11.3
-# include ${PETSC_DIR}/lib/petsc/conf/variables
-# include ${PETSC_DIR}/lib/petsc/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
 
 # For PETSC 3.5.3
-include ${PETSC_DIR}/conf/variables
-include ${PETSC_DIR}/conf/rules
+# include ${PETSC_DIR}/conf/variables
+# include ${PETSC_DIR}/conf/rules
 
 system: ${OBJSC} chkopts
 	${CLINKER} -o ${LIBBASE} ${OBJSC} ${PETSC_LIB} 
